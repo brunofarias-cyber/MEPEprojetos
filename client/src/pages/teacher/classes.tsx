@@ -1,11 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Class } from "@shared/schema";
 
 export default function TeacherClasses() {
+  const { user } = useAuth();
+  const teacherId = user?.roleData?.id;
+
   const { data: classes = [], isLoading } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
+    queryKey: ["/api/teachers", teacherId, "classes"],
+    enabled: !!teacherId,
   });
+
+  if (!teacherId) {
+    return (
+      <div className="animate-fade-in">
+        <h2 className="text-3xl font-bold text-foreground mb-8" data-testid="heading-classes">Minhas Turmas</h2>
+        <div className="bg-card border border-card-border p-12 rounded-2xl text-center">
+          <p className="text-lg text-muted-foreground">Dados do professor não encontrados</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

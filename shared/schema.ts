@@ -120,6 +120,7 @@ export const submissions = pgTable("submissions", {
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey(),
   name: text("name").notNull(),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   studentCount: integer("student_count").notNull().default(0),
   engagement: integer("engagement").notNull().default(0), // 0-100%
 });

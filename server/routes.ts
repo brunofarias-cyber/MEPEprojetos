@@ -520,6 +520,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/teachers/:id/classes", async (req, res) => {
+    const classes = await storage.getClassesByTeacher(req.params.id);
+    res.json(classes);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

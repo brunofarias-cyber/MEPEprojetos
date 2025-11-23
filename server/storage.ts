@@ -87,6 +87,7 @@ export interface IStorage {
   // Classes
   getClass(id: string): Promise<Class | undefined>;
   getClasses(): Promise<Class[]>;
+  getClassesByTeacher(teacherId: string): Promise<Class[]>;
   createClass(classData: InsertClass): Promise<Class>;
 }
 
@@ -384,6 +385,10 @@ export class DatabaseStorage implements IStorage {
 
   async getClasses(): Promise<Class[]> {
     return await db.select().from(schema.classes);
+  }
+
+  async getClassesByTeacher(teacherId: string): Promise<Class[]> {
+    return await db.select().from(schema.classes).where(eq(schema.classes.teacherId, teacherId));
   }
 
   async createClass(insertClass: InsertClass): Promise<Class> {
