@@ -8,6 +8,7 @@ import express, {
 } from "express";
 import session from "express-session";
 import MemoryStore from "memorystore";
+import jwt from 'jsonwebtoken';
 
 import { registerRoutes } from "./routes";
 
@@ -62,6 +63,25 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// JWT Token authentication middleware
+const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
+
+app.use((req, _res, next) => {
+  // Check for Bearer token in Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
+      req.session.userId = decoded.userId;
+      console.log('[JWT Auth] User authenticated via token:', decoded.userId);
+    } catch (error) {
+      console.error('[JWT Auth] Invalid token:', error);
+    }
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

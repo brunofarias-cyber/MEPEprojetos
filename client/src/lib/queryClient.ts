@@ -11,8 +11,17 @@ export async function apiRequest(
   url: string,
   options?: RequestInit,
 ): Promise<any> {
+  // Get JWT token from localStorage for authentication
+  const token = localStorage.getItem('bprojetos_token');
+
+  const headers = new Headers(options?.headers);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const res = await fetch(url, {
     ...options,
+    headers,
     credentials: "include",
   });
 

@@ -1,7 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
+
+const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
 import { 
   insertUserSchema,
   insertProjectSchema, 
@@ -147,13 +150,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cookie: req.session.cookie
       });
 
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
       // Force save session before sending response
       req.session.save((err) => {
         if (err) {
           console.error("[LOGIN] Session save error:", err);
           return res.status(500).json({ error: "Erro ao salvar sessão" });
         }
-        console.log("[LOGIN] Session saved successfully, sending response");
+        console.log("[LOGIN] Session saved successfully, sending response with token");
         res.json({
           id: user.id,
           email: user.email,
@@ -161,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: user.name,
           avatar: user.avatar,
           roleData,
+          token, // Include token in response
         });
       });
     } catch (error: any) {

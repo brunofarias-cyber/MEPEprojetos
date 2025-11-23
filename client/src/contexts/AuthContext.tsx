@@ -32,12 +32,30 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // Try to restore user from localStorage first
+  useEffect(() => {
+    const storedUser = localStorage.getItem('bprojetos_user');
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        console.log("[AuthContext] User restored from localStorage:", parsedUser);
+      } catch (e) {
+        console.error("[AuthContext] Failed to parse stored user:", e);
+        localStorage.removeItem('bprojetos_user');
+      }
+    }
+    setIsRestoring(false);
+  }, []);
 
   // Fetch current user on mount
-  const { data: currentUser, isLoading, error } = useQuery<User>({
+  const { data: currentUser, error } = useQuery<User>({
     queryKey: ['/api/auth/me'],
     retry: false,
     refetchOnWindowFocus: false,
+    enabled: false, // Disable auto-fetch since we're using localStorage
   });
 
   useEffect(() => {
@@ -61,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: async (data) => {
       console.log("[loginMutation] onSuccess called with:", data);
+      // Store token in localStorage (more secure than just userId)
+      if (data.token) {
+        localStorage.setItem('bprojetos_token', data.token);
+      }
+      // Also store user for display purposes
+      localStorage.setItem('bprojetos_user', JSON.stringify(data));
       setUser(data);
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
@@ -93,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onSuccess: () => {
+      localStorage.removeItem('bprojetos_user');
+      localStorage.removeItem('bprojetos_token');
       setUser(null);
       queryClient.clear();
       window.location.href = '/login';
@@ -120,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading: isRestoring, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
