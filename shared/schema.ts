@@ -95,6 +95,7 @@ export const bnccCompetencies = pgTable("bncc_competencies", {
   name: text("name").notNull(),
   category: text("category").notNull(), // Geral, Específica
   description: text("description"),
+  documentId: varchar("document_id").references(() => bnccDocuments.id, { onDelete: 'cascade' }),
 });
 
 // Project Competencies (mapping)

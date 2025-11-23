@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { storage } from "./storage";
 import { extractCompetenciesFromText, analyzeProjectAlignment } from "./services/bnccAiService";
 
@@ -543,35 +543,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(classes);
   });
 
-  // BNCC Document Routes
+  // BNCC Document Routes (Coordinator-only)
   app.get("/api/bncc-documents", async (req, res) => {
+    // Validate authentication
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    // Validate coordinator role
+    if (req.user.role !== 'coordinator') {
+      return res.status(403).json({ error: "Apenas coordenadores podem acessar documentos BNCC" });
+    }
+
     const documents = await storage.getBnccDocuments();
     res.json(documents);
   });
 
   app.post("/api/bncc-documents/upload", upload.single('pdf'), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+      // Validate authentication
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
       }
 
-      if (!req.user || req.user.role !== 'coordinator') {
-        return res.status(403).json({ error: "Only coordinators can upload BNCC documents" });
+      // Validate coordinator role
+      if (req.user.role !== 'coordinator') {
+        return res.status(403).json({ error: "Apenas coordenadores podem fazer upload de documentos BNCC" });
+      }
+
+      // Validate file upload
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
       }
 
       // Get coordinator ID from user
       const coordinator = await storage.getCoordinatorByUserId(req.user.id);
       if (!coordinator) {
-        return res.status(404).json({ error: "Coordinator not found" });
+        return res.status(404).json({ error: "Coordenador não encontrado" });
       }
 
       console.log("[BNCC Upload] Processing PDF:", req.file.originalname);
 
-      // Extract text from PDF
-      const pdfData = await pdfParse(req.file.buffer);
-      const textContent = pdfData.text;
-
-      console.log("[BNCC Upload] PDF text extracted, length:", textContent.length);
+      // Extract text from PDF using pdf-parse v2 API
+      let textContent: string;
+      try {
+        const parser = new PDFParse({ data: req.file.buffer });
+        const result = await parser.getText();
+        await parser.destroy();
+        textContent = result.text;
+        console.log("[BNCC Upload] PDF text extracted, length:", textContent.length);
+      } catch (pdfError: any) {
+        console.error("[BNCC Upload] PDF parsing failed:", pdfError);
+        return res.status(400).json({ error: "Erro ao processar PDF: " + pdfError.message });
+      }
 
       // Create document record with processing status
       const document = await storage.createBnccDocument({
@@ -582,20 +606,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         competenciesExtracted: 0,
       });
 
-      console.log("[BNCC Upload] Document record created, starting AI extraction...");
+      console.log("[BNCC Upload] Document record created:", document.id, "- starting AI extraction...");
 
       // Start async AI processing (don't block the response)
       (async () => {
         try {
           const extractedCompetencies = await extractCompetenciesFromText(textContent);
-          console.log("[BNCC Upload] Extracted", extractedCompetencies.length, "competencies");
+          console.log("[BNCC Upload] Extracted", extractedCompetencies.length, "competencies for document:", document.id);
 
-          // Save extracted competencies to database
+          // Save extracted competencies to database with document linkage
           for (const comp of extractedCompetencies) {
             await storage.createCompetency({
               name: comp.name,
               category: comp.category,
               description: comp.description,
+              documentId: document.id, // Link competency to source document
             });
           }
 
@@ -605,9 +630,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             competenciesExtracted: extractedCompetencies.length,
           });
 
-          console.log("[BNCC Upload] Processing completed successfully");
-        } catch (error) {
-          console.error("[BNCC Upload] Processing failed:", error);
+          console.log("[BNCC Upload] Processing completed successfully for document:", document.id);
+        } catch (aiError) {
+          console.error("[BNCC Upload] AI processing failed for document", document.id, ":", aiError);
           await storage.updateBnccDocument(document.id, {
             processingStatus: "failed",
           });
@@ -616,8 +641,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(document);
     } catch (error: any) {
-      console.error("[BNCC Upload] Error:", error);
-      res.status(500).json({ error: error.message });
+      console.error("[BNCC Upload] Unexpected error:", error);
+      res.status(500).json({ error: "Erro interno do servidor: " + error.message });
     }
   });
 

@@ -58,6 +58,41 @@ After extensive debugging of session cookie persistence issues in the Replit env
 - ✅ Sidebar navigation links added for Coordinator role
 - ✅ E2E testing passed (full user flow verified)
 
+### Task 4: BNCC PDF Upload & AI Analysis (✅ COMPLETED)
+Implemented comprehensive BNCC document management with AI-powered competency extraction:
+
+**Backend Infrastructure**:
+- Database schema: `bncc_documents` table with processing status tracking
+- Storage layer: Full CRUD operations for BNCC documents
+- PDF parsing: pdf-parse v2 library for text extraction
+- File upload: Multer middleware with 20MB limit, PDF-only validation
+- Security: Coordinator-only access enforcement with JWT authentication
+
+**AI Integration** (OpenAI via Replit AI Integrations):
+- `extractCompetenciesFromText`: Analyzes BNCC PDF content and extracts structured competencies (name, category, description) as JSON
+- `analyzeProjectAlignment`: Evaluates which BNCC competencies align with a given project and suggests coverage percentages
+- Async processing: Upload returns immediately, AI extraction runs in background
+- Status tracking: processing → completed/failed transitions with competency count
+
+**API Endpoints**:
+- `GET /api/bncc-documents` - List all uploaded BNCC documents
+- `POST /api/bncc-documents/upload` - Upload PDF (coordinator-only, multipart/form-data)
+- `POST /api/projects/:id/analyze-alignment` - Analyze project alignment with BNCC
+
+**Frontend (Coordinator Only)**:
+- BNCC page at `/bncc` with sidebar navigation
+- File upload interface with drag-drop support
+- Real-time status display (processing, completed, failed)
+- Document list showing filename, extraction count, status icons
+- Toast notifications for upload success/failure
+- E2E tested: UI accessible, all elements present and functional
+
+**Technical Notes**:
+- Uses Replit AI Integrations (no API key needed, charges to Replit credits)
+- Handles markdown code blocks in AI responses (````json`)
+- Comprehensive error handling for PDF parsing, AI extraction, and database operations
+- Portuguese error messages for user-facing endpoints
+
 ## System Architecture
 
 ### Frontend Architecture

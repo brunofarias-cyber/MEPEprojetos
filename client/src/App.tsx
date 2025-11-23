@@ -28,6 +28,7 @@ import CoordinatorKanban from "@/pages/coordinator/kanban";
 import CoordinatorTeachers from "@/pages/coordinator/teachers";
 import CoordinatorStudents from "@/pages/coordinator/students";
 import CoordinatorMetrics from "@/pages/coordinator/metrics";
+import CoordinatorBncc from "@/pages/coordinator/bncc";
 
 function ProtectedRoutes() {
   const { user, isLoading, logout } = useAuth();
@@ -92,6 +93,7 @@ function ProtectedRoutes() {
                     <Route path="/teachers" component={CoordinatorTeachers} />
                     <Route path="/students" component={CoordinatorStudents} />
                     <Route path="/metrics" component={CoordinatorMetrics} />
+                    <Route path="/bncc" component={CoordinatorBncc} />
                   </>
                 )}
 
