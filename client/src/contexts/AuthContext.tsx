@@ -144,8 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logoutMutation.mutateAsync();
   };
 
+  const isLoading = isRestoring || loginMutation.isPending || registerMutation.isPending;
+
   return (
-    <AuthContext.Provider value={{ user, isLoading: isRestoring, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

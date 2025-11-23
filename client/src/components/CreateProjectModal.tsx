@@ -1,16 +1,37 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { insertProjectSchema } from "@shared/schema";
 import type { InsertProject } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icon } from "@/components/Icon";
+import { z } from "zod";
+
+// Extended schema with proper nullable handling and coercion
+const projectFormSchema = z.object({
+  title: z.string().min(1, "Título é obrigatório"),
+  subject: z.string().min(1, "Disciplina é obrigatória"),
+  status: z.string().default("Planejamento"),
+  theme: z.string().default("blue"),
+  teacherId: z.string().min(1, "ID do professor é obrigatório"),
+  progress: z.coerce.number().int().min(0).max(100).default(0),
+  students: z.coerce.number().int().gte(1, "Número de alunos deve ser pelo menos 1").default(1),
+  delayed: z.boolean().default(false),
+  description: z.string().nullable().transform(val => (val?.trim() ? val.trim() : null)).default(null),
+  nextDeadline: z.string().nullable().transform(val => (val?.trim() ? val.trim() : null)).default(null),
+  deadlineLabel: z.string().nullable().transform(val => (val?.trim() ? val.trim() : null)).default(null),
+});
+
+type ProjectFormValues = z.input<typeof projectFormSchema>;
 
 export function CreateProjectModal() {
   const [open, setOpen] = useState(false);
@@ -18,14 +39,26 @@ export function CreateProjectModal() {
   const { toast } = useToast();
   const teacherId = user?.roleData?.id;
 
-  const [formData, setFormData] = useState({
-    title: "",
-    subject: "",
-    description: "",
-    theme: "blue" as const,
-    students: 1,
-    nextDeadline: "",
-    deadlineLabel: "",
+  // Don't render until teacherId is available
+  if (!teacherId) {
+    return null;
+  }
+
+  const form = useForm<ProjectFormValues>({
+    resolver: zodResolver(projectFormSchema),
+    defaultValues: {
+      title: "",
+      subject: "",
+      status: "Planejamento",
+      progress: 0,
+      students: 1,
+      theme: "blue",
+      teacherId: teacherId,
+      delayed: false,
+      description: null,
+      nextDeadline: null,
+      deadlineLabel: null,
+    },
   });
 
   const createMutation = useMutation({
@@ -43,14 +76,18 @@ export function CreateProjectModal() {
         description: "O novo projeto foi adicionado com sucesso.",
       });
       setOpen(false);
-      setFormData({
+      form.reset({
         title: "",
         subject: "",
-        description: "",
-        theme: "blue",
+        status: "Planejamento",
+        progress: 0,
         students: 1,
-        nextDeadline: "",
-        deadlineLabel: "",
+        theme: "blue",
+        teacherId: teacherId,
+        delayed: false,
+        description: null,
+        nextDeadline: null,
+        deadlineLabel: null,
       });
     },
     onError: (error: Error) => {
@@ -62,56 +99,11 @@ export function CreateProjectModal() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!teacherId) {
-      toast({
-        title: "Erro",
-        description: "ID do professor não encontrado",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      toast({
-        title: "Erro",
-        description: "O título é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.subject.trim()) {
-      toast({
-        title: "Erro",
-        description: "A disciplina é obrigatória",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const payload: InsertProject = {
-      title: formData.title.trim(),
-      subject: formData.subject.trim(),
-      status: "Planejamento",
-      theme: formData.theme,
-      teacherId,
-      progress: 0,
-      students: formData.students,
-      delayed: false,
-      description: formData.description.trim() || null,
-      nextDeadline: formData.nextDeadline.trim() || null,
-      deadlineLabel: formData.deadlineLabel.trim() || null,
-    };
-
+  const onSubmit = (data: z.output<typeof projectFormSchema>) => {
+    // Schema transforms have already ensured correct types
+    const payload: InsertProject = data as InsertProject;
     createMutation.mutate(payload);
   };
-
-  if (!teacherId) {
-    return null;
-  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -125,114 +117,183 @@ export function CreateProjectModal() {
         <DialogHeader>
           <DialogTitle>Criar Novo Projeto</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Título do Projeto *</Label>
-            <Input 
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              placeholder="Ex: Sustentabilidade na Escola" 
-              data-testid="input-title"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Título do Projeto *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ex: Sustentabilidade na Escola" 
+                      {...field} 
+                      data-testid="input-title"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div>
-            <Label htmlFor="subject">Disciplina *</Label>
-            <Input 
-              id="subject"
-              value={formData.subject}
-              onChange={(e) => setFormData({...formData, subject: e.target.value})}
-              placeholder="Ex: Ciências, Matemática" 
-              data-testid="input-subject"
+            <FormField
+              control={form.control}
+              name="subject"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Disciplina *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ex: Ciências, Matemática" 
+                      {...field} 
+                      data-testid="input-subject"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div>
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea 
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              placeholder="Descreva o objetivo do projeto..." 
-              data-testid="input-description"
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Descreva o objetivo do projeto..." 
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      data-testid="input-description"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="theme">Cor do Tema *</Label>
-              <Select 
-                value={formData.theme} 
-                onValueChange={(value: any) => setFormData({...formData, theme: value})}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="theme"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cor do Tema *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-theme">
+                          <SelectValue placeholder="Selecione uma cor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="green">Verde</SelectItem>
+                        <SelectItem value="blue">Azul</SelectItem>
+                        <SelectItem value="purple">Roxo</SelectItem>
+                        <SelectItem value="red">Vermelho</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="students"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número de Alunos *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={1}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.valueAsNumber;
+                          field.onChange(Number.isNaN(value) ? "" : value);
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                        data-testid="input-students"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nextDeadline"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Próximo Prazo</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Ex: 15 de Dezembro" 
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                        data-testid="input-deadline"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="deadlineLabel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Prazo</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Ex: Entrega Final" 
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                        data-testid="input-deadline-label"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="button-cancel"
               >
-                <SelectTrigger id="theme" data-testid="select-theme">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="green">Verde</SelectItem>
-                  <SelectItem value="blue">Azul</SelectItem>
-                  <SelectItem value="purple">Roxo</SelectItem>
-                  <SelectItem value="red">Vermelho</SelectItem>
-                </SelectContent>
-              </Select>
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={createMutation.isPending}
+                data-testid="button-submit"
+              >
+                {createMutation.isPending ? "Criando..." : "Criar Projeto"}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="students">Número de Alunos *</Label>
-              <Input 
-                id="students"
-                type="number" 
-                min={1}
-                value={formData.students}
-                onChange={(e) => setFormData({...formData, students: parseInt(e.target.value, 10) || 1})}
-                data-testid="input-students"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="deadline">Próximo Prazo</Label>
-              <Input 
-                id="deadline"
-                value={formData.nextDeadline}
-                onChange={(e) => setFormData({...formData, nextDeadline: e.target.value})}
-                placeholder="Ex: 15 de Dezembro" 
-                data-testid="input-deadline"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="deadlineLabel">Tipo de Prazo</Label>
-              <Input 
-                id="deadlineLabel"
-                value={formData.deadlineLabel}
-                onChange={(e) => setFormData({...formData, deadlineLabel: e.target.value})}
-                placeholder="Ex: Entrega Final" 
-                data-testid="input-deadline-label"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              data-testid="button-cancel"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={createMutation.isPending}
-              data-testid="button-submit"
-            >
-              {createMutation.isPending ? "Criando..." : "Criar Projeto"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
