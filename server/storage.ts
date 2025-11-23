@@ -148,6 +148,20 @@ export class MemStorage implements IStorage {
       const id = randomUUID();
       this.achievements.set(id, { ...a, id });
     });
+
+    // Seed Rubric Criteria for all projects
+    const projectIds = Array.from(this.projects.keys());
+    projectIds.forEach((projectId, idx) => {
+      const rubricCriteria: InsertRubricCriteria[] = [
+        { projectId, criteria: "Investigação e Pesquisa", weight: 40, level1: "Não apresentou pesquisa", level2: "Pesquisa superficial", level3: "Pesquisa consistente", level4: "Pesquisa aprofundada e inovadora" },
+        { projectId, criteria: "Trabalho Colaborativo", weight: 30, level1: "Trabalho individual", level2: "Pouca colaboração", level3: "Boa colaboração", level4: "Excelente sinergia em equipe" },
+        { projectId, criteria: "Apresentação e Comunicação", weight: 30, level1: "Apresentação deficiente", level2: "Comunicação básica", level3: "Boa comunicação", level4: "Comunicação excelente e criativa" },
+      ];
+      rubricCriteria.forEach(rc => {
+        const id = randomUUID();
+        this.rubricCriteria.set(id, { ...rc, id });
+      });
+    });
   }
 
   // Teachers

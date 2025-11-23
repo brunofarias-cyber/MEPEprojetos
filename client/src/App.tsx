@@ -55,11 +55,6 @@ function AppContent() {
     enabled: role === 'teacher',
   });
 
-  const { data: rubrics = [], isLoading: rubricsLoading } = useQuery<RubricCriteria[]>({
-    queryKey: ['/api/rubrics'],
-    enabled: false, // Will be fetched per project
-  });
-
   const { data: achievements = [], isLoading: achievementsLoading } = useQuery<StudentAchievementWithDetails[]>({
     queryKey: ['/api/students', 'student-1', 'achievements'],
     enabled: role === 'student', // Using mock student ID for demo
@@ -99,7 +94,7 @@ function AppContent() {
       if (activeTab === 'dashboard') return <TeacherDashboard projects={projects} teachers={teachers} />;
       if (activeTab === 'classes') return <TeacherClasses classes={classes} />;
       if (activeTab === 'reports') return <TeacherReports competencies={competencies} />;
-      if (activeTab === 'rubrics') return <TeacherRubrics rubrics={rubrics} />;
+      if (activeTab === 'rubrics') return <TeacherRubrics />;
     }
 
     // Student views
@@ -114,7 +109,7 @@ function AppContent() {
     if (role === 'coordinator') {
       if (activeTab === 'kanban') return <CoordinatorKanban projects={projects} />;
       if (activeTab === 'teachers') return <CoordinatorTeachers teachers={teachers} />;
-      if (activeTab === 'metrics') return <CoordinatorMetrics />;
+      if (activeTab === 'metrics') return <CoordinatorMetrics projects={projects} teachers={teachers} />;
     }
 
     return null;
