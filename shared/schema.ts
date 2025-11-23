@@ -125,6 +125,17 @@ export const classes = pgTable("classes", {
   engagement: integer("engagement").notNull().default(0), // 0-100%
 });
 
+// BNCC Documents (uploaded PDF files)
+export const bnccDocuments = pgTable("bncc_documents", {
+  id: varchar("id").primaryKey(),
+  filename: text("filename").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => coordinators.id, { onDelete: 'cascade' }),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  textContent: text("text_content"), // Extracted text from PDF
+  processingStatus: text("processing_status").notNull().default("processing"), // processing, completed, failed
+  competenciesExtracted: integer("competencies_extracted").default(0),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({ id: true });
@@ -138,6 +149,7 @@ export const insertBnccCompetencySchema = createInsertSchema(bnccCompetencies).o
 export const insertProjectCompetencySchema = createInsertSchema(projectCompetencies).omit({ id: true });
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true });
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true });
+export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({ id: true, uploadedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -175,6 +187,9 @@ export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 
 export type Class = typeof classes.$inferSelect;
 export type InsertClass = z.infer<typeof insertClassSchema>;
+
+export type BnccDocument = typeof bnccDocuments.$inferSelect;
+export type InsertBnccDocument = z.infer<typeof insertBnccDocumentSchema>;
 
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };

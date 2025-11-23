@@ -15,6 +15,7 @@ import type {
   ProjectCompetency, InsertProjectCompetency,
   Submission, InsertSubmission,
   Class, InsertClass,
+  BnccDocument, InsertBnccDocument,
   ProjectWithTeacher,
   StudentAchievementWithDetails,
 } from "@shared/schema";
@@ -89,6 +90,12 @@ export interface IStorage {
   getClasses(): Promise<Class[]>;
   getClassesByTeacher(teacherId: string): Promise<Class[]>;
   createClass(classData: InsertClass): Promise<Class>;
+
+  // BNCC Documents
+  getBnccDocument(id: string): Promise<BnccDocument | undefined>;
+  getBnccDocuments(): Promise<BnccDocument[]>;
+  createBnccDocument(document: InsertBnccDocument): Promise<BnccDocument>;
+  updateBnccDocument(id: string, document: Partial<InsertBnccDocument>): Promise<BnccDocument | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -395,6 +402,30 @@ export class DatabaseStorage implements IStorage {
     const id = randomUUID();
     const [classData] = await db.insert(schema.classes).values({ ...insertClass, id }).returning();
     return classData;
+  }
+
+  // BNCC Documents
+  async getBnccDocument(id: string): Promise<BnccDocument | undefined> {
+    const [document] = await db.select().from(schema.bnccDocuments).where(eq(schema.bnccDocuments.id, id));
+    return document || undefined;
+  }
+
+  async getBnccDocuments(): Promise<BnccDocument[]> {
+    return await db.select().from(schema.bnccDocuments);
+  }
+
+  async createBnccDocument(insertDocument: InsertBnccDocument): Promise<BnccDocument> {
+    const id = randomUUID();
+    const [document] = await db.insert(schema.bnccDocuments).values({ ...insertDocument, id }).returning();
+    return document;
+  }
+
+  async updateBnccDocument(id: string, documentUpdate: Partial<InsertBnccDocument>): Promise<BnccDocument | undefined> {
+    const [updated] = await db.update(schema.bnccDocuments)
+      .set(documentUpdate)
+      .where(eq(schema.bnccDocuments.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

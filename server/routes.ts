@@ -2,7 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import multer from "multer";
+import pdfParse from "pdf-parse";
 import { storage } from "./storage";
+import { extractCompetenciesFromText, analyzeProjectAlignment } from "./services/bnccAiService";
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
 import { 
@@ -19,6 +22,21 @@ import {
   insertClassSchema,
 } from "@shared/schema";
 import { z } from "zod";
+
+// Configure multer for file uploads (memory storage for PDF processing)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB max file size
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
 
 // Extend Express Request to include user
 declare global {
@@ -523,6 +541,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teachers/:id/classes", async (req, res) => {
     const classes = await storage.getClassesByTeacher(req.params.id);
     res.json(classes);
+  });
+
+  // BNCC Document Routes
+  app.get("/api/bncc-documents", async (req, res) => {
+    const documents = await storage.getBnccDocuments();
+    res.json(documents);
+  });
+
+  app.post("/api/bncc-documents/upload", upload.single('pdf'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      if (!req.user || req.user.role !== 'coordinator') {
+        return res.status(403).json({ error: "Only coordinators can upload BNCC documents" });
+      }
+
+      // Get coordinator ID from user
+      const coordinator = await storage.getCoordinatorByUserId(req.user.id);
+      if (!coordinator) {
+        return res.status(404).json({ error: "Coordinator not found" });
+      }
+
+      console.log("[BNCC Upload] Processing PDF:", req.file.originalname);
+
+      // Extract text from PDF
+      const pdfData = await pdfParse(req.file.buffer);
+      const textContent = pdfData.text;
+
+      console.log("[BNCC Upload] PDF text extracted, length:", textContent.length);
+
+      // Create document record with processing status
+      const document = await storage.createBnccDocument({
+        filename: req.file.originalname,
+        uploadedBy: coordinator.id,
+        textContent,
+        processingStatus: "processing",
+        competenciesExtracted: 0,
+      });
+
+      console.log("[BNCC Upload] Document record created, starting AI extraction...");
+
+      // Start async AI processing (don't block the response)
+      (async () => {
+        try {
+          const extractedCompetencies = await extractCompetenciesFromText(textContent);
+          console.log("[BNCC Upload] Extracted", extractedCompetencies.length, "competencies");
+
+          // Save extracted competencies to database
+          for (const comp of extractedCompetencies) {
+            await storage.createCompetency({
+              name: comp.name,
+              category: comp.category,
+              description: comp.description,
+            });
+          }
+
+          // Update document status
+          await storage.updateBnccDocument(document.id, {
+            processingStatus: "completed",
+            competenciesExtracted: extractedCompetencies.length,
+          });
+
+          console.log("[BNCC Upload] Processing completed successfully");
+        } catch (error) {
+          console.error("[BNCC Upload] Processing failed:", error);
+          await storage.updateBnccDocument(document.id, {
+            processingStatus: "failed",
+          });
+        }
+      })();
+
+      res.status(201).json(document);
+    } catch (error: any) {
+      console.error("[BNCC Upload] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI-powered project alignment analysis
+  app.post("/api/projects/:id/analyze-alignment", async (req, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const competencies = await storage.getCompetencies();
+      if (competencies.length === 0) {
+        return res.status(400).json({ error: "No BNCC competencies available. Please upload the BNCC document first." });
+      }
+
+      console.log("[Project Alignment] Analyzing project:", project.title);
+
+      const alignments = await analyzeProjectAlignment(
+        project.title,
+        project.subject,
+        project.description,
+        competencies
+      );
+
+      console.log("[Project Alignment] Found", alignments.length, "alignments");
+
+      // Save alignments to database
+      for (const alignment of alignments) {
+        await storage.createProjectCompetency({
+          projectId: project.id,
+          competencyId: alignment.competencyId,
+          coverage: alignment.coverage,
+        });
+      }
+
+      res.json({ alignments });
+    } catch (error: any) {
+      console.error("[Project Alignment] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   const httpServer = createServer(app);
