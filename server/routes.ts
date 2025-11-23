@@ -141,14 +141,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Store user in session
       req.session.userId = user.id;
+      console.log("[LOGIN] Session after save:", {
+        sessionID: req.sessionID,
+        userId: req.session.userId,
+        cookie: req.session.cookie
+      });
 
-      res.json({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        avatar: user.avatar,
-        roleData,
+      // Force save session before sending response
+      req.session.save((err) => {
+        if (err) {
+          console.error("[LOGIN] Session save error:", err);
+          return res.status(500).json({ error: "Erro ao salvar sessão" });
+        }
+        console.log("[LOGIN] Session saved successfully, sending response");
+        res.json({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          avatar: user.avatar,
+          roleData,
+        });
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -166,8 +179,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/me", async (req, res) => {
+    console.log("[/api/auth/me] Request received:", {
+      sessionID: req.sessionID,
+      userId: req.session.userId,
+      cookie: req.session.cookie,
+      headers: req.headers.cookie
+    });
     const userId = req.session.userId;
     if (!userId) {
+      console.log("[/api/auth/me] No userId in session, returning 401");
       return res.status(401).json({ error: "Não autenticado" });
     }
 

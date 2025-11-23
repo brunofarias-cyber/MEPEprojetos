@@ -26,12 +26,16 @@ import StudentAchievements from "@/pages/student/achievements";
 // Coordinator views
 import CoordinatorKanban from "@/pages/coordinator/kanban";
 import CoordinatorTeachers from "@/pages/coordinator/teachers";
+import CoordinatorStudents from "@/pages/coordinator/students";
 import CoordinatorMetrics from "@/pages/coordinator/metrics";
 
 function ProtectedRoutes() {
   const { user, isLoading, logout } = useAuth();
 
+  console.log("[ProtectedRoutes] Render:", { user, isLoading });
+
   if (isLoading) {
+    console.log("[ProtectedRoutes] Showing loading state");
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/20">
         <div className="text-center">
@@ -43,8 +47,11 @@ function ProtectedRoutes() {
   }
 
   if (!user) {
+    console.log("[ProtectedRoutes] No user, redirecting to login");
     return <Redirect to="/login" />;
   }
+
+  console.log("[ProtectedRoutes] User authenticated, rendering dashboard for role:", user.role);
 
   // Custom sidebar width
   const style = {
@@ -89,6 +96,7 @@ function ProtectedRoutes() {
                   <>
                     <Route path="/" component={CoordinatorKanban} />
                     <Route path="/teachers" component={CoordinatorTeachers} />
+                    <Route path="/students" component={CoordinatorStudents} />
                     <Route path="/metrics" component={CoordinatorMetrics} />
                   </>
                 )}

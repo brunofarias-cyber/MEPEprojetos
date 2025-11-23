@@ -130,6 +130,14 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/students'}>
+                      <Link href="/students" data-testid="nav-alunos">
+                        <Icon name="users" size={20} />
+                        <span>Alunos</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === '/metrics'}>
                       <Link href="/metrics" data-testid="nav-metricas">
                         <Icon name="pieChart" size={20} />

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Teacher } from "@shared/schema";
+import type { Student } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Pencil, UserCheck } from "lucide-react";
+import { Search, Plus, Pencil, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -29,58 +29,58 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-export default function TeachersPage() {
+export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const { toast } = useToast();
 
-  const { data: teachers = [], isLoading } = useQuery<Teacher[]>({
-    queryKey: ["/api/teachers"],
+  const { data: students = [], isLoading } = useQuery<Student[]>({
+    queryKey: ["/api/students"],
   });
 
-  const filteredTeachers = teachers.filter(
-    (teacher) =>
-      teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.subject.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (teacher: Teacher) => {
-    setEditingTeacher(teacher);
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student);
     setIsDialogOpen(true);
   };
 
   const handleAdd = () => {
-    setEditingTeacher(null);
+    setEditingStudent(null);
     setIsDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setEditingTeacher(null);
+    setEditingStudent(null);
   };
 
   return (
     <div className="flex flex-col h-full p-6 space-y-6">
       <div className="flex flex-row items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-teachers">
-            Gestão de Professores
+          <h1 className="text-3xl font-bold" data-testid="heading-students">
+            Gestão de Alunos
           </h1>
           <p className="text-muted-foreground">
-            Gerencie o cadastro de professores da escola
+            Gerencie o cadastro de alunos da escola
           </p>
         </div>
-        <Button onClick={handleAdd} data-testid="button-add-teacher">
+        <Button onClick={handleAdd} data-testid="button-add-student">
           <Plus className="w-4 h-4 mr-2" />
-          Adicionar Professor
+          Adicionar Aluno
         </Button>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
-          placeholder="Buscar por nome ou matéria..."
+          placeholder="Buscar por nome ou email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -102,31 +102,31 @@ export default function TeachersPage() {
             </Card>
           ))}
         </div>
-      ) : filteredTeachers.length === 0 ? (
+      ) : filteredStudents.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <UserCheck className="w-16 h-16 text-muted-foreground mb-4" />
+            <Users className="w-16 h-16 text-muted-foreground mb-4" />
             <p className="text-muted-foreground" data-testid="text-no-results">
               {searchTerm
-                ? "Nenhum professor encontrado"
-                : "Nenhum professor cadastrado"}
+                ? "Nenhum aluno encontrado"
+                : "Nenhum aluno cadastrado"}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTeachers.map((teacher) => (
+          {filteredStudents.map((student) => (
             <Card
-              key={teacher.id}
+              key={student.id}
               className="hover-elevate"
-              data-testid={`card-teacher-${teacher.id}`}
+              data-testid={`card-student-${student.id}`}
             >
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Avatar>
-                    <AvatarImage src={teacher.avatar || undefined} />
+                    <AvatarImage src={student.avatar || undefined} />
                     <AvatarFallback>
-                      {teacher.name
+                      {student.name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
@@ -137,31 +137,34 @@ export default function TeachersPage() {
                   <div className="flex-1 min-w-0">
                     <CardTitle
                       className="text-base truncate"
-                      data-testid={`text-teacher-name-${teacher.id}`}
+                      data-testid={`text-student-name-${student.id}`}
                     >
-                      {teacher.name}
+                      {student.name}
                     </CardTitle>
                     <p
                       className="text-sm text-muted-foreground truncate"
-                      data-testid={`text-teacher-subject-${teacher.id}`}
+                      data-testid={`text-student-email-${student.id}`}
                     >
-                      {teacher.subject}
+                      {student.email}
                     </p>
                   </div>
                 </div>
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => handleEdit(teacher)}
-                  data-testid={`button-edit-teacher-${teacher.id}`}
+                  onClick={() => handleEdit(student)}
+                  data-testid={`button-edit-student-${student.id}`}
                 >
                   <Pencil className="w-4 h-4" />
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" data-testid={`badge-rating-${teacher.id}`}>
-                    ⭐ {teacher.rating || 0}/5
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" data-testid={`badge-level-${student.id}`}>
+                    Nível {student.level || 1}
+                  </Badge>
+                  <Badge variant="outline" data-testid={`badge-xp-${student.id}`}>
+                    {student.xp || 0} XP
                   </Badge>
                 </div>
               </CardContent>
@@ -170,61 +173,63 @@ export default function TeachersPage() {
         </div>
       )}
 
-      <TeacherDialog
+      <StudentDialog
         open={isDialogOpen}
         onClose={handleCloseDialog}
-        teacher={editingTeacher}
+        student={editingStudent}
       />
     </div>
   );
 }
 
-const teacherFormSchema = z.object({
+const studentFormSchema = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  subject: z.string().min(2, "Matéria deve ter no mínimo 2 caracteres"),
+  email: z.string().email("Email inválido"),
   userId: z.string().min(1, "ID do usuário é obrigatório"),
   avatar: z.string().optional(),
-  rating: z.number().min(0).max(5).optional(),
+  xp: z.number().min(0).optional(),
+  level: z.number().min(1).optional(),
 });
 
-type TeacherFormData = z.infer<typeof teacherFormSchema>;
+type StudentFormData = z.infer<typeof studentFormSchema>;
 
-function TeacherDialog({
+function StudentDialog({
   open,
   onClose,
-  teacher,
+  student,
 }: {
   open: boolean;
   onClose: () => void;
-  teacher: Teacher | null;
+  student: Student | null;
 }) {
   const { toast } = useToast();
-  const isEditing = !!teacher;
+  const isEditing = !!student;
 
-  const form = useForm<TeacherFormData>({
-    resolver: zodResolver(teacherFormSchema),
+  const form = useForm<StudentFormData>({
+    resolver: zodResolver(studentFormSchema),
     defaultValues: {
-      name: teacher?.name || "",
-      subject: teacher?.subject || "",
-      userId: teacher?.userId || "",
-      avatar: teacher?.avatar || "",
-      rating: teacher?.rating || 0,
+      name: student?.name || "",
+      email: student?.email || "",
+      userId: student?.userId || "",
+      avatar: student?.avatar || "",
+      xp: student?.xp || 0,
+      level: student?.level || 1,
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: TeacherFormData) => {
-      return await apiRequest("/api/teachers", {
+    mutationFn: async (data: StudentFormData) => {
+      return await apiRequest("/api/students", {
         method: "POST",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       toast({
-        title: "Professor criado",
-        description: "Professor criado com sucesso!",
+        title: "Aluno criado",
+        description: "Aluno criado com sucesso!",
       });
       onClose();
       form.reset();
@@ -232,38 +237,38 @@ function TeacherDialog({
     onError: () => {
       toast({
         title: "Erro",
-        description: "Erro ao criar professor. Tente novamente.",
+        description: "Erro ao criar aluno. Tente novamente.",
         variant: "destructive",
       });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: Partial<TeacherFormData>) => {
-      return await apiRequest(`/api/teachers/${teacher?.id}`, {
+    mutationFn: async (data: Partial<StudentFormData>) => {
+      return await apiRequest(`/api/students/${student?.id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/teachers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       toast({
-        title: "Professor atualizado",
-        description: "Dados do professor atualizados com sucesso!",
+        title: "Aluno atualizado",
+        description: "Dados do aluno atualizados com sucesso!",
       });
       onClose();
     },
     onError: () => {
       toast({
         title: "Erro",
-        description: "Erro ao atualizar professor. Tente novamente.",
+        description: "Erro ao atualizar aluno. Tente novamente.",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: TeacherFormData) => {
+  const onSubmit = (data: StudentFormData) => {
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
@@ -273,15 +278,15 @@ function TeacherDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent data-testid="dialog-teacher-form">
+      <DialogContent data-testid="dialog-student-form">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Editar Professor" : "Adicionar Professor"}
+            {isEditing ? "Editar Aluno" : "Adicionar Aluno"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Atualize os dados do professor"
-              : "Preencha os dados para criar um novo professor"}
+              ? "Atualize os dados do aluno"
+              : "Preencha os dados para criar um novo aluno"}
           </DialogDescription>
         </DialogHeader>
 
@@ -295,9 +300,9 @@ function TeacherDialog({
                   <FormLabel>Nome Completo</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Ex: Maria Silva"
+                      placeholder="Ex: João Silva"
                       {...field}
-                      data-testid="input-teacher-name"
+                      data-testid="input-student-name"
                     />
                   </FormControl>
                   <FormMessage />
@@ -307,15 +312,16 @@ function TeacherDialog({
 
             <FormField
               control={form.control}
-              name="subject"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Matéria</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Ex: Matemática"
+                      type="email"
+                      placeholder="joao@aluno.com"
                       {...field}
-                      data-testid="input-teacher-subject"
+                      data-testid="input-student-email"
                     />
                   </FormControl>
                   <FormMessage />
@@ -334,7 +340,7 @@ function TeacherDialog({
                       <Input
                         placeholder="ID do usuário existente"
                         {...field}
-                        data-testid="input-teacher-userid"
+                        data-testid="input-student-userid"
                       />
                     </FormControl>
                     <FormMessage />
@@ -343,27 +349,47 @@ function TeacherDialog({
               />
             )}
 
-            <FormField
-              control={form.control}
-              name="rating"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Avaliação (0-5)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="5"
-                      step="0.1"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      data-testid="input-teacher-rating"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="xp"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>XP</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        data-testid="input-student-xp"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="level"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        data-testid="input-student-level"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
               <Button

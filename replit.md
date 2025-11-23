@@ -8,6 +8,33 @@ BProjetos is a comprehensive educational project management platform designed fo
 
 Preferred communication style: Simple, everyday language.
 
+## Project Status
+
+### Task 2: Authentication System (Completed - Backend Functional)
+- ✅ PostgreSQL schema with users, teachers, students, coordinators tables
+- ✅ Foreign keys with cascade delete implemented
+- ✅ Bcrypt password hashing (10 rounds)
+- ✅ Express-session with MemoryStore for development
+- ✅ Auth API routes: /api/auth/register, /api/auth/login, /api/auth/logout, /api/auth/me
+- ✅ Frontend AuthContext with useQuery + mutations
+- ✅ ProtectedRoutes with role-based routing
+- ✅ Login/Register pages implemented
+- 📝 Backend verified working with curl tests
+- ⚠️ E2E tests pending manual verification
+
+**Demo Credentials**:
+- Coordenador: coordenador@escola.com / demo123
+- Professor: ana@escola.com / demo123
+- Aluno: lucas.alves@aluno.com / demo123
+
+### Task 3: Roster Management (In Progress)
+- ✅ Teacher management page with CRUD operations (/teachers)
+- ✅ Student management page with CRUD operations (/students)
+- ✅ Search/filter functionality for both pages
+- ✅ Modal forms with validation (react-hook-form + zod)
+- ✅ Sidebar navigation links added for Coordinator role
+- 🔄 E2E testing in progress
+
 ## System Architecture
 
 ### Frontend Architecture
