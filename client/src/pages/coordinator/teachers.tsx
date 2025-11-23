@@ -1,11 +1,23 @@
+import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import type { Teacher } from "@shared/schema";
 
-interface CoordinatorTeachersProps {
-  teachers: Teacher[];
-}
+export default function CoordinatorTeachers() {
+  const { data: teachers = [], isLoading } = useQuery<Teacher[]>({
+    queryKey: ['/api/teachers'],
+  });
 
-export default function CoordinatorTeachers({ teachers }: CoordinatorTeachersProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in space-y-8">
       <div>

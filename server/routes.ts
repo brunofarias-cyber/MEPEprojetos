@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { 
+  insertUserSchema,
   insertProjectSchema, 
   insertTeacherSchema, 
   insertRubricCriteriaSchema,
@@ -13,8 +15,188 @@ import {
   insertSubmissionSchema,
   insertClassSchema,
 } from "@shared/schema";
+import { z } from "zod";
+
+// Extend Express Request to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+        name: string;
+      };
+    }
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication Routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const registerSchema = z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        name: z.string().min(1),
+        role: z.enum(["teacher", "student", "coordinator"]),
+        subject: z.string().optional(), // for teachers
+      });
+
+      const data = registerSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email já está em uso" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+
+      // Create user
+      const user = await storage.createUser({
+        email: data.email,
+        hashedPassword,
+        role: data.role,
+        name: data.name,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.name}`,
+      });
+
+      // Create role-specific record
+      if (data.role === "teacher") {
+        await storage.createTeacher({
+          userId: user.id,
+          name: data.name,
+          subject: data.subject || "Não especificado",
+          avatar: user.avatar,
+          rating: 0,
+        });
+      } else if (data.role === "student") {
+        await storage.createStudent({
+          userId: user.id,
+          name: data.name,
+          email: data.email,
+          avatar: user.avatar,
+          xp: 0,
+          level: 1,
+        });
+      } else if (data.role === "coordinator") {
+        await storage.createCoordinator({
+          userId: user.id,
+          name: data.name,
+          avatar: user.avatar,
+        });
+      }
+
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      console.log("[LOGIN] Request received:", {
+        headers: req.headers,
+        body: req.body,
+        rawBody: JSON.stringify(req.body)
+      });
+
+      const loginSchema = z.object({
+        email: z.string().email(),
+        password: z.string(),
+      });
+
+      const data = loginSchema.parse(req.body);
+      console.log("[LOGIN] Parsed data:", data);
+
+      // Find user
+      const user = await storage.getUserByEmail(data.email);
+      console.log("[LOGIN] User found:", user ? { id: user.id, email: user.email, hasHash: !!user.hashedPassword } : "null");
+      if (!user) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      // Verify password
+      const validPassword = await bcrypt.compare(data.password, user.hashedPassword);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Credenciais inválidas" });
+      }
+
+      // Get role-specific data
+      let roleData = null;
+      if (user.role === "teacher") {
+        roleData = await storage.getTeacherByUserId(user.id);
+      } else if (user.role === "student") {
+        roleData = await storage.getStudentByUserId(user.id);
+      } else if (user.role === "coordinator") {
+        roleData = await storage.getCoordinatorByUserId(user.id);
+      }
+
+      // Store user in session
+      req.session.userId = user.id;
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        avatar: user.avatar,
+        roleData,
+      });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Erro ao fazer logout" });
+      }
+      res.clearCookie('connect.sid'); // Clear session cookie
+      res.status(204).send();
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    // Get role-specific data
+    let roleData = null;
+    if (user.role === "teacher") {
+      roleData = await storage.getTeacherByUserId(user.id);
+    } else if (user.role === "student") {
+      roleData = await storage.getStudentByUserId(user.id);
+    } else if (user.role === "coordinator") {
+      roleData = await storage.getCoordinatorByUserId(user.id);
+    }
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+      avatar: user.avatar,
+      roleData,
+    });
+  });
+
+  // Existing routes below...
   // Teachers
   app.get("/api/teachers", async (req, res) => {
     const teachers = await storage.getTeachers();

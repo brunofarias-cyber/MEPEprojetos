@@ -6,6 +6,8 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import session from "express-session";
+import MemoryStore from "memorystore";
 
 import { registerRoutes } from "./routes";
 
@@ -22,11 +24,35 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// Configure session middleware
+const MemStore = MemoryStore(session);
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'bprojetos-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  }),
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  },
+}));
+
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+  }
+}
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
   }
 }
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;

@@ -1,5 +1,7 @@
 import { BrandLogo } from "./BrandLogo";
 import { Icon } from "./Icon";
+import { Link, useLocation } from "wouter";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Sidebar,
   SidebarContent,
@@ -14,13 +16,15 @@ import {
 } from "@/components/ui/sidebar";
 
 interface AppSidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
   role: 'teacher' | 'student' | 'coordinator';
   onLogout: () => void;
+  userName: string;
+  userAvatar?: string | null;
 }
 
-export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSidebarProps) {
+export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarProps) {
+  const [location] = useLocation();
+
   const getRoleLabel = () => {
     if (role === 'teacher') return 'Professor';
     if (role === 'student') return 'Aluno';
@@ -42,21 +46,11 @@ export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSideb
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={activeTab === 'dashboard' || activeTab === 'kanban' || activeTab === 'student-home'}
-                >
-                  <button
-                    onClick={() => {
-                      if(role === 'coordinator') setActiveTab('kanban');
-                      else if(role === 'student') setActiveTab('student-home');
-                      else setActiveTab('dashboard');
-                    }}
-                    data-testid="nav-visao-geral"
-                  >
+                <SidebarMenuButton asChild isActive={location === '/'}>
+                  <Link href="/" data-testid="nav-visao-geral">
                     <Icon name="home" size={20} />
                     <span>Visão Geral</span>
-                  </button>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -72,27 +66,27 @@ export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSideb
               {role === 'teacher' && (
                 <>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'classes'}>
-                      <button onClick={() => setActiveTab('classes')} data-testid="nav-turmas">
+                    <SidebarMenuButton asChild isActive={location === '/classes'}>
+                      <Link href="/classes" data-testid="nav-turmas">
                         <Icon name="users" size={20} />
                         <span>Turmas</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'reports'}>
-                      <button onClick={() => setActiveTab('reports')} data-testid="nav-relatorios">
+                    <SidebarMenuButton asChild isActive={location === '/reports'}>
+                      <Link href="/reports" data-testid="nav-relatorios">
                         <Icon name="barChart" size={20} />
                         <span>Relatórios</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'rubrics'}>
-                      <button onClick={() => setActiveTab('rubrics')} data-testid="nav-rubricas">
+                    <SidebarMenuButton asChild isActive={location === '/rubrics'}>
+                      <Link href="/rubrics" data-testid="nav-rubricas">
                         <Icon name="clipboard" size={20} />
                         <span>Rubricas</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>
@@ -100,27 +94,27 @@ export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSideb
               {role === 'student' && (
                 <>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'projects'}>
-                      <button onClick={() => setActiveTab('projects')} data-testid="nav-projetos">
+                    <SidebarMenuButton asChild isActive={location === '/projects'}>
+                      <Link href="/projects" data-testid="nav-projetos">
                         <Icon name="book" size={20} />
                         <span>Projetos</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'calendar'}>
-                      <button onClick={() => setActiveTab('calendar')} data-testid="nav-calendario">
+                    <SidebarMenuButton asChild isActive={location === '/calendar'}>
+                      <Link href="/calendar" data-testid="nav-calendario">
                         <Icon name="calendar" size={20} />
                         <span>Calendário</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'achievements'}>
-                      <button onClick={() => setActiveTab('achievements')} data-testid="nav-conquistas">
+                    <SidebarMenuButton asChild isActive={location === '/achievements'}>
+                      <Link href="/achievements" data-testid="nav-conquistas">
                         <Icon name="award" size={20} />
                         <span>Conquistas</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>
@@ -128,27 +122,19 @@ export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSideb
               {role === 'coordinator' && (
                 <>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'kanban'}>
-                      <button onClick={() => setActiveTab('kanban')} data-testid="nav-kanban">
-                        <Icon name="grid" size={20} />
-                        <span>Kanban</span>
-                      </button>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'teachers'}>
-                      <button onClick={() => setActiveTab('teachers')} data-testid="nav-professores">
+                    <SidebarMenuButton asChild isActive={location === '/teachers'}>
+                      <Link href="/teachers" data-testid="nav-professores">
                         <Icon name="users" size={20} />
                         <span>Professores</span>
-                      </button>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={activeTab === 'metrics'}>
-                      <button onClick={() => setActiveTab('metrics')} data-testid="nav-indicadores">
-                        <Icon name="barChart" size={20} />
-                        <span>Indicadores</span>
-                      </button>
+                    <SidebarMenuButton asChild isActive={location === '/metrics'}>
+                      <Link href="/metrics" data-testid="nav-metricas">
+                        <Icon name="pieChart" size={20} />
+                        <span>Métricas</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>
@@ -159,21 +145,28 @@ export function AppSidebar({ activeTab, setActiveTab, role, onLogout }: AppSideb
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <button onClick={onLogout} data-testid="button-logout">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <Icon name="logout" size={18} />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-sm font-bold">Sair</span>
-                  <span className="text-xs text-muted-foreground">{getRoleLabel()}</span>
-                </div>
-              </button>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="px-4 py-4 border-t border-border">
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={userAvatar || undefined} alt={userName} />
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {userName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-foreground truncate">{userName}</p>
+              <p className="text-xs text-muted-foreground">{getRoleLabel()}</p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="w-full bg-background border border-border text-foreground px-4 py-2 rounded-lg font-medium hover-elevate flex items-center justify-center gap-2 transition"
+            data-testid="button-logout"
+          >
+            <Icon name="logOut" size={16} />
+            <span>Sair</span>
+          </button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

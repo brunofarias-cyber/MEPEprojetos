@@ -1,12 +1,27 @@
+import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import type { ProjectWithTeacher, Teacher } from "@shared/schema";
 
-interface CoordinatorMetricsProps {
-  projects: ProjectWithTeacher[];
-  teachers: Teacher[];
-}
+export default function CoordinatorMetrics() {
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProjectWithTeacher[]>({
+    queryKey: ['/api/projects'],
+  });
 
-export default function CoordinatorMetrics({ projects, teachers }: CoordinatorMetricsProps) {
+  const { data: teachers = [], isLoading: teachersLoading } = useQuery<Teacher[]>({
+    queryKey: ['/api/teachers'],
+  });
+
+  if (projectsLoading || teachersLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate real stats from backend data
   const completedProjects = projects.filter(p => p.status === "Para Avaliação").length;
   const activeProjects = projects.filter(p => p.status === "Em Andamento").length;

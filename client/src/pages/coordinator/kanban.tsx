@@ -1,11 +1,22 @@
+import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import type { ProjectWithTeacher } from "@shared/schema";
 
-interface CoordinatorKanbanProps {
-  projects: ProjectWithTeacher[];
-}
+export default function CoordinatorKanban() {
+  const { data: projects = [], isLoading } = useQuery<ProjectWithTeacher[]>({
+    queryKey: ['/api/projects'],
+  });
 
-export default function CoordinatorKanban({ projects }: CoordinatorKanbanProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
   const columns = [
     { id: 'Planejamento', title: 'Planejamento', color: 'bg-blue-100 text-blue-700 border-blue-200' },
     { id: 'Em Andamento', title: 'Em Andamento', color: 'bg-green-100 text-green-700 border-green-200' },

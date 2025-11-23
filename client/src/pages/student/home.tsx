@@ -1,20 +1,36 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import { Icon } from "@/components/Icon";
 import { ProjectCard } from "@/components/ProjectCard";
 import { SubmitEvidenceModal } from "@/components/SubmitEvidenceModal";
 import type { ProjectWithTeacher } from "@shared/schema";
 
-interface StudentHomeProps {
-  projects: ProjectWithTeacher[];
-  studentXp: number;
-  studentLevel: number;
-}
-
-export default function StudentHome({ projects, studentXp, studentLevel }: StudentHomeProps) {
+export default function StudentHome() {
+  const { user } = useAuth();
   const [selectedProject, setSelectedProject] = useState<ProjectWithTeacher | null>(null);
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ProjectWithTeacher[]>({
+    queryKey: ['/api/projects'],
+  });
+
+  // Get student data from user's roleData
+  const studentXp = user?.roleData?.xp || 0;
+  const studentLevel = user?.roleData?.level || 1;
 
   const xpForNextLevel = studentLevel * 1000;
   const xpProgress = (studentXp % 1000) / 10;
+
+  if (projectsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = (data: { type: 'file' | 'link'; link?: string; comment: string }) => {
     console.log('Submission data:', data);

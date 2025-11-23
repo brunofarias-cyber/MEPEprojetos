@@ -1,13 +1,24 @@
+import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ProjectCard } from "@/components/ProjectCard";
-import type { ProjectWithTeacher, Teacher } from "@shared/schema";
+import type { ProjectWithTeacher } from "@shared/schema";
 
-interface TeacherDashboardProps {
-  projects: ProjectWithTeacher[];
-  teachers: Teacher[];
-}
+export default function TeacherDashboard() {
+  const { data: projects = [], isLoading } = useQuery<ProjectWithTeacher[]>({
+    queryKey: ['/api/projects'],
+  });
 
-export default function TeacherDashboard({ projects, teachers }: TeacherDashboardProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   const stats = [
     { label: "Projetos Ativos", value: projects.filter(p => p.status === "Em Andamento").length, icon: "book", color: "text-blue-600 bg-blue-50" },
     { label: "Alunos Engajados", value: projects.reduce((sum, p) => sum + p.students, 0), icon: "users", color: "text-green-600 bg-green-50" },

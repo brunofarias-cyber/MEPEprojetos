@@ -1,4 +1,5 @@
 import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,7 +16,7 @@ export const users = pgTable("users", {
 // Coordinators table
 export const coordinators = pgTable("coordinators", {
   id: varchar("id").primaryKey(),
-  userId: varchar("user_id").notNull().unique(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   avatar: text("avatar"),
 });
@@ -23,7 +24,7 @@ export const coordinators = pgTable("coordinators", {
 // Teachers table
 export const teachers = pgTable("teachers", {
   id: varchar("id").primaryKey(),
-  userId: varchar("user_id").notNull().unique(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   subject: text("subject").notNull(),
   avatar: text("avatar"),
@@ -41,7 +42,7 @@ export const projects = pgTable("projects", {
   nextDeadline: text("next_deadline"),
   deadlineLabel: text("deadline_label"),
   theme: text("theme").notNull(), // green, blue, purple, red
-  teacherId: varchar("teacher_id").notNull(),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   delayed: boolean("delayed").notNull().default(false),
   description: text("description"),
 });
@@ -49,16 +50,19 @@ export const projects = pgTable("projects", {
 // Rubric Criteria table
 export const rubricCriteria = pgTable("rubric_criteria", {
   id: varchar("id").primaryKey(),
-  projectId: varchar("project_id").notNull(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   criteria: text("criteria").notNull(),
   weight: integer("weight").notNull(),
-  levels: text("levels").notNull().array(), // Array of level descriptions
+  level1: text("level1").notNull(),
+  level2: text("level2").notNull(),
+  level3: text("level3").notNull(),
+  level4: text("level4").notNull(),
 });
 
 // Students table
 export const students = pgTable("students", {
   id: varchar("id").primaryKey(),
-  userId: varchar("user_id").notNull().unique(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   avatar: text("avatar"),
@@ -78,8 +82,8 @@ export const achievements = pgTable("achievements", {
 // Student Achievements (progress tracking)
 export const studentAchievements = pgTable("student_achievements", {
   id: varchar("id").primaryKey(),
-  studentId: varchar("student_id").notNull(),
-  achievementId: varchar("achievement_id").notNull(),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  achievementId: varchar("achievement_id").notNull().references(() => achievements.id, { onDelete: 'cascade' }),
   progress: integer("progress").notNull().default(0),
   total: integer("total").notNull(),
   unlocked: boolean("unlocked").notNull().default(false),
@@ -96,16 +100,16 @@ export const bnccCompetencies = pgTable("bncc_competencies", {
 // Project Competencies (mapping)
 export const projectCompetencies = pgTable("project_competencies", {
   id: varchar("id").primaryKey(),
-  projectId: varchar("project_id").notNull(),
-  competencyId: varchar("competency_id").notNull(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  competencyId: varchar("competency_id").notNull().references(() => bnccCompetencies.id, { onDelete: 'cascade' }),
   coverage: integer("coverage").notNull().default(0), // 0-100%
 });
 
 // Submissions
 export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey(),
-  projectId: varchar("project_id").notNull(),
-  studentId: varchar("student_id").notNull(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
   type: text("type").notNull(), // file or link
   content: text("content").notNull(), // URL or file path
   comment: text("comment"),
@@ -174,3 +178,59 @@ export type InsertClass = z.infer<typeof insertClassSchema>;
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };
 export type StudentAchievementWithDetails = StudentAchievement & { achievementTitle: string; achievementDescription: string; achievementXp: number; achievementIcon: string };
+
+// Drizzle Relations
+export const usersRelations = relations(users, ({ one }) => ({
+  teacher: one(teachers, { fields: [users.id], references: [teachers.userId] }),
+  student: one(students, { fields: [users.id], references: [students.userId] }),
+  coordinator: one(coordinators, { fields: [users.id], references: [coordinators.userId] }),
+}));
+
+export const coordinatorsRelations = relations(coordinators, ({ one }) => ({
+  user: one(users, { fields: [coordinators.userId], references: [users.id] }),
+}));
+
+export const teachersRelations = relations(teachers, ({ one, many }) => ({
+  user: one(users, { fields: [teachers.userId], references: [users.id] }),
+  projects: many(projects),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  teacher: one(teachers, { fields: [projects.teacherId], references: [teachers.id] }),
+  rubricCriteria: many(rubricCriteria),
+  competencies: many(projectCompetencies),
+  submissions: many(submissions),
+}));
+
+export const rubricCriteriaRelations = relations(rubricCriteria, ({ one }) => ({
+  project: one(projects, { fields: [rubricCriteria.projectId], references: [projects.id] }),
+}));
+
+export const studentsRelations = relations(students, ({ one, many }) => ({
+  user: one(users, { fields: [students.userId], references: [users.id] }),
+  achievements: many(studentAchievements),
+  submissions: many(submissions),
+}));
+
+export const studentAchievementsRelations = relations(studentAchievements, ({ one }) => ({
+  student: one(students, { fields: [studentAchievements.studentId], references: [students.id] }),
+  achievement: one(achievements, { fields: [studentAchievements.achievementId], references: [achievements.id] }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  studentAchievements: many(studentAchievements),
+}));
+
+export const projectCompetenciesRelations = relations(projectCompetencies, ({ one }) => ({
+  project: one(projects, { fields: [projectCompetencies.projectId], references: [projects.id] }),
+  competency: one(bnccCompetencies, { fields: [projectCompetencies.competencyId], references: [bnccCompetencies.id] }),
+}));
+
+export const bnccCompetenciesRelations = relations(bnccCompetencies, ({ many }) => ({
+  projects: many(projectCompetencies),
+}));
+
+export const submissionsRelations = relations(submissions, ({ one }) => ({
+  project: one(projects, { fields: [submissions.projectId], references: [projects.id] }),
+  student: one(students, { fields: [submissions.studentId], references: [students.id] }),
+}));
