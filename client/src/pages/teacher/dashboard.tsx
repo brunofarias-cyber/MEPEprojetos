@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ProjectCard } from "@/components/ProjectCard";
+import { CreateProjectModal } from "@/components/CreateProjectModal";
 import type { ProjectWithTeacher } from "@shared/schema";
 
 export default function TeacherDashboard() {
@@ -54,10 +55,7 @@ export default function TeacherDashboard() {
       <div>
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-foreground">Projetos em Andamento</h3>
-          <button className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold hover:bg-primary/90 shadow-md flex items-center gap-2 transition" data-testid="button-new-project">
-            <Icon name="plus" size={18} />
-            Novo Projeto
-          </button>
+          <CreateProjectModal />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
