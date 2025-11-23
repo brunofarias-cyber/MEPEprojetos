@@ -10,30 +10,53 @@ Preferred communication style: Simple, everyday language.
 
 ## Project Status
 
-### Task 2: Authentication System (Completed - Backend Functional)
+### Task 2: Authentication System (✅ COMPLETED)
 - ✅ PostgreSQL schema with users, teachers, students, coordinators tables
 - ✅ Foreign keys with cascade delete implemented
 - ✅ Bcrypt password hashing (10 rounds)
-- ✅ Express-session with MemoryStore for development
+- ✅ **JWT Token Authentication** (signed tokens, 7-day expiration)
+- ✅ Express-session with MemoryStore for development (backward compatible)
 - ✅ Auth API routes: /api/auth/register, /api/auth/login, /api/auth/logout, /api/auth/me
-- ✅ Frontend AuthContext with useQuery + mutations
+- ✅ Frontend AuthContext with localStorage persistence
 - ✅ ProtectedRoutes with role-based routing
 - ✅ Login/Register pages implemented
-- 📝 Backend verified working with curl tests
-- ⚠️ E2E tests pending manual verification
+- ✅ Token-based auth middleware (validates JWT signature)
+- ✅ E2E tests passing (login, navigation, token persistence, logout)
 
 **Demo Credentials**:
 - Coordenador: coordenador@escola.com / demo123
 - Professor: ana@escola.com / demo123
 - Aluno: lucas.alves@aluno.com / demo123
 
-### Task 3: Roster Management (In Progress)
+## Recent Updates (Nov 23, 2025)
+
+### JWT Authentication Implementation
+After extensive debugging of session cookie persistence issues in the Replit environment, implemented a secure JWT token-based authentication system:
+
+**Technical Details**:
+- Backend generates cryptographically signed JWT tokens on login (using `jsonwebtoken`)
+- Token payload: `{ userId, email, role }`, expires in 7 days
+- Frontend stores token in localStorage and injects `Authorization: Bearer {token}` header in all API requests
+- Backend middleware validates token signature before populating `req.session.userId`
+- Session-based auth still supported for backward compatibility
+
+**Security**:
+- Tokens are signed with SESSION_SECRET (cannot be forged)
+- Token validation prevents user impersonation
+- Much more secure than client-controlled headers
+
+**User Experience**:
+- Login persists across page refreshes
+- Automatic token injection in all requests
+- Seamless logout with token cleanup
+
+### Task 3: Roster Management (✅ COMPLETED)
 - ✅ Teacher management page with CRUD operations (/teachers)
 - ✅ Student management page with CRUD operations (/students)
 - ✅ Search/filter functionality for both pages
 - ✅ Modal forms with validation (react-hook-form + zod)
 - ✅ Sidebar navigation links added for Coordinator role
-- 🔄 E2E testing in progress
+- ✅ E2E testing passed (full user flow verified)
 
 ## System Architecture
 
