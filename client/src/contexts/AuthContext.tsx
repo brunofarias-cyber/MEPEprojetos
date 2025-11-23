@@ -41,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        console.log("[AuthContext] User restored from localStorage:", parsedUser);
       } catch (e) {
         console.error("[AuthContext] Failed to parse stored user:", e);
         localStorage.removeItem('bprojetos_user');

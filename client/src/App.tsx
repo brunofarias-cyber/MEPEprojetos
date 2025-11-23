@@ -32,10 +32,7 @@ import CoordinatorMetrics from "@/pages/coordinator/metrics";
 function ProtectedRoutes() {
   const { user, isLoading, logout } = useAuth();
 
-  console.log("[ProtectedRoutes] Render:", { user, isLoading });
-
   if (isLoading) {
-    console.log("[ProtectedRoutes] Showing loading state");
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-primary/20 via-background to-secondary/20">
         <div className="text-center">
@@ -47,11 +44,8 @@ function ProtectedRoutes() {
   }
 
   if (!user) {
-    console.log("[ProtectedRoutes] No user, redirecting to login");
     return <Redirect to="/login" />;
   }
-
-  console.log("[ProtectedRoutes] User authenticated, rendering dashboard for role:", user.role);
 
   // Custom sidebar width
   const style = {
@@ -118,9 +112,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/:rest*">
-        <ProtectedRoutes />
-      </Route>
+      <Route component={ProtectedRoutes} />
     </Switch>
   );
 }
