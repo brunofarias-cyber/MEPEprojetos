@@ -24,6 +24,9 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
+// Trust proxy for Replit HTTPS environment
+app.set('trust proxy', 1);
+
 // Configure session middleware
 const MemStore = MemoryStore(session);
 app.use(session({
@@ -36,8 +39,8 @@ app.use(session({
   cookie: {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     httpOnly: true,
-    secure: false, // Set to false for dev/test compatibility
-    sameSite: 'lax', // More permissive for dev environment
+    secure: true, // Required for HTTPS (Replit preview)
+    sameSite: 'none', // Required for cross-origin cookies in Replit
   },
 }));
 
