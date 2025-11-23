@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BProjetos - Gestão Escolar</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F8FAFC; }
+        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
+        
+        .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide-up { animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0px); } }
+        
+        /* Glassmorphism & Gradients */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .hero-gradient {
+            background: radial-gradient(circle at top left, #e0e7ff 0%, #f3e8ff 40%, #ffffff 100%);
+        }
+        
+        /* Scrollbar customizada */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 20px; width: 20px;
+            border-radius: 50%; background: #4F46E5; cursor: pointer;
+            margin-top: -8px; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer;
+            background: #E2E8F0; border-radius: 99px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- LOGO PREMIUM ---
+        const BrandLogo = ({ size = 40, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+                <defs>
+                    <linearGradient id="bookGradient" x1="0" y1="100" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#4338ca" />
+                        <stop offset="1" stopColor="#6366f1" />
+                    </linearGradient>
+                    <linearGradient id="plantGradient" x1="50" y1="100" x2="50" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#15803d" />
+                        <stop offset="1" stopColor="#4ade80" />
+                    </linearGradient>
+                </defs>
+                <path d="M10 75 C10 75 30 85 50 75 C70 65 90 75 90 75 V 85 C90 85 70 75 50 85 C30 95 10 85 10 85 V 75 Z" fill="url(#bookGradient)" opacity="0.8"/>
+                <path d="M10 70 C10 70 30 80 50 70 C70 60 90 70 90 70 V 80 C90 80 70 70 50 80 C30 90 10 80 10 80 V 70 Z" fill="white" opacity="0.3"/>
+                <path d="M50 75 V 85" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M50 75 Q 50 50 50 30" stroke="url(#plantGradient)" strokeWidth="4" strokeLinecap="round"/>
+                <path d="M50 50 Q 70 40 80 20 Q 60 20 50 50" fill="url(#plantGradient)"/>
+                <path d="M50 40 Q 30 30 20 10 Q 40 10 50 40" fill="url(#plantGradient)" opacity="0.9"/>
+                <circle cx="20" cy="10" r="4" fill="#8b5cf6"/>
+                <circle cx="80" cy="20" r="4" fill="#8b5cf6"/>
+                <circle cx="35" cy="25" r="3" fill="#8b5cf6"/>
+                <circle cx="65" cy="30" r="3" fill="#8b5cf6"/>
+                <line x1="50" y1="40" x2="20" y2="10" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+                <line x1="50" y1="50" x2="80" y2="20" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+                <line x1="50" y1="35" x2="35" y2="25" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+            </svg>
+        );
+
+        // --- ICONS ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                home: <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>,
+                book: <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>,
+                users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>,
+                plus: <line x1="12" y1="5" x2="12" y2="19"/>,
+                check: <polyline points="20 6 9 17 4 12"/>,
+                clock: <circle cx="12" cy="12" r="10"/>,
+                award: <circle cx="12" cy="8" r="7"/>,
+                calendar: <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>,
+                barChart: <line x1="18" y1="20" x2="18" y2="10"/>,
+                settings: <circle cx="12" cy="12" r="3"/>,
+                leaf: <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.77 10-10 10Z"/>,
+                edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>,
+                x: <line x1="18" y1="6" x2="6" y2="18"/>,
+                alert: <circle cx="12" cy="12" r="10"/>,
+                grid: <rect x="3" y="3" width="7" height="7"/>,
+                rocket: <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>,
+                logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>,
+                upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>,
+                download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                link: <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>,
+                arrowRight: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
+                clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></>
+            };
+            
+            const extras = {
+                book: <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>,
+                users: <circle cx="9" cy="7" r="4"/>,
+                plus: <line x1="5" y1="12" x2="19" y2="12"/>,
+                calendar: <line x1="16" y1="2" x2="16" y2="6"/>,
+                alert: <line x1="12" y1="8" x2="12" y2="12"/>,
+                grid: <rect x="14" y="3" width="7" height="7"/>,
+                barChart: <line x1="12" y1="20" x2="12" y2="4"/>,
+                link: <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            };
+            const extras2 = {
+                 calendar: <line x1="8" y1="2" x2="8" y2="6"/>,
+                 alert: <line x1="12" y1="16" x2="12.01" y2="16"/>,
+                 grid: <rect x="14" y="14" width="7" height="7"/>,
+                 barChart: <line x1="6" y1="20" x2="6" y2="14"/>
+            };
+            const extras3 = {
+                calendar: <line x1="3" y1="10" x2="21" y2="10"/>,
+                grid: <rect x="3" y="14" width="7" height="7"/>
+            };
+
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name]}
+                    {extras[name]}
+                    {extras2[name]}
+                    {extras3[name]}
+                </svg>
+            );
+        };
+
+        // --- DADOS MOCKADOS ---
+        const MOCK_TEACHERS = [
+            { id: 1, name: "Ana Silva", subject: "Biologia", projects: 4, rating: 4.8, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ana" },
+            { id: 2, name: "Carlos Souza", subject: "História", projects: 2, rating: 4.5, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos" },
+            { id: 3, name: "Roberto Lima", subject: "Física", projects: 3, rating: 4.9, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Roberto" },
+            { id: 4, name: "Mariana Dias", subject: "Inglês", projects: 1, rating: 4.2, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mariana" }
+        ];
+
+        const MOCK_PROJECTS = [
+            { id: 1, title: "Horta Sustentável", subject: "Bio & Mat", status: "Em Andamento", progress: 65, students: 24, nextDeadline: "2023-11-12", deadlineLabel: "Relatório de Crescimento", theme: "green", teacher: "Ana Silva", delayed: false },
+            { id: 2, title: "Jornal Digital", subject: "Port & Hist", status: "Planejamento", progress: 15, students: 18, nextDeadline: "2023-11-20", deadlineLabel: "Definição de Pautas", theme: "blue", teacher: "Carlos Souza", delayed: false },
+            { id: 3, title: "Robótica Sucata", subject: "Fís & Art", status: "Para Avaliação", progress: 100, students: 30, nextDeadline: "2023-10-30", deadlineLabel: "Apresentação Final", theme: "purple", teacher: "Roberto Lima", delayed: false },
+            { id: 4, title: "Teatro Shake", subject: "Lit & Ing", status: "Atrasado", progress: 40, students: 22, nextDeadline: "2023-10-15", deadlineLabel: "Ensaios Gerais", theme: "red", teacher: "Mariana Dias", delayed: true }
+        ];
+
+        const MOCK_ACHIEVEMENTS = [
+            { id: 1, title: "Pontualidade Britânica", desc: "Entregar 3 tarefas antes do prazo final.", xp: 500, progress: 2, total: 3, icon: "clock" },
+            { id: 2, title: "Mestre da BNCC", desc: "Completar todas as competências de um projeto.", xp: 1000, progress: 8, total: 10, icon: "award" },
+            { id: 3, title: "Colaborador", desc: "Participar de 2 projetos em grupo.", xp: 300, progress: 2, total: 2, icon: "users", unlocked: true }
+        ];
+
+        const MOCK_RUBRIC = [
+            { criteria: "Investigação Científica", weight: 40, levels: ["Não apresentou dados.", "Dados superficiais.", "Dados relevantes e bem analisados.", "Análise profunda com fontes extras."] },
+            { criteria: "Trabalho em Equipe", weight: 30, levels: ["Conflitos constantes.", "Colaboração mínima.", "Boa divisão de tarefas.", "Sinergia e apoio mútuo."] },
+            { criteria: "Comunicação Oral", weight: 30, levels: ["Leitura de slides.", "Fala pouco clara.", "Boa oratória.", "Apresentação engajadora e profissional."] }
+        ];
+
+        // --- LANDING PAGE PREMIUM ---
+        const LandingPage = ({ onEnter }) => (
+            <div className="min-h-screen hero-gradient flex flex-col relative overflow-hidden">
+                {/* Decorative Blobs */}
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-300/30 rounded-full blur-3xl mix-blend-multiply filter animate-float -z-10"></div>
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-300/30 rounded-full blur-3xl mix-blend-multiply filter animate-float -z-10" style={{animationDelay: "2s"}}></div>
+
+                {/* Navbar */}
+                <nav className="px-8 py-6 flex justify-between items-center max-w-7xl mx-auto w-full">
+                    <div className="flex items-center gap-3">
+                        <BrandLogo size={40} />
+                        <span className="text-2xl font-bold text-slate-800 tracking-tight">BProjetos</span>
+                    </div>
+                    <div className="hidden md:flex gap-6 text-sm font-semibold text-slate-600">
+                        <a href="#" className="hover:text-indigo-600 transition">Sobre</a>
+                        <a href="#" className="hover:text-indigo-600 transition">Recursos</a>
+                        <a href="#" className="hover:text-indigo-600 transition">Preços</a>
+                    </div>
+                    <button className="px-6 py-2.5 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 text-sm">
+                        Agendar Demo
+                    </button>
+                </nav>
+
+                {/* Hero Content */}
+                <div className="flex-1 flex flex-col md:flex-row items-center justify-center max-w-7xl mx-auto w-full px-6 md:px-12 gap-12 py-12">
+                    
+                    {/* Left Text */}
+                    <div className="md:w-1/2 animate-slide-up space-y-8">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-sm font-bold">
+                            <span className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                            </span>
+                            Plataforma #1 para Escolas Inovadoras
+                        </div>
+                        
+                        <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight">
+                            Projetos que <br/>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Engajam Alunos</span>
+                        </h1>
+                        
+                        <p className="text-xl text-slate-600 leading-relaxed max-w-lg">
+                            Centralize a gestão pedagógica, automatize o acompanhamento da BNCC e transforme atividades escolares em experiências gamificadas.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                            <div className="flex items-center gap-[-10px]">
+                                <div className="flex -space-x-4">
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt=""/>
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ane" alt=""/>
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Bob" alt=""/>
+                                </div>
+                                <span className="ml-6 text-sm font-bold text-slate-600">+500 Escolas usam</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Login Cards */}
+                    <div className="md:w-1/2 w-full grid gap-4 animate-slide-up" style={{animationDelay: "0.2s"}}>
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">Acesso Rápido (Ambiente Demo)</p>
+                        
+                        <button onClick={() => onEnter('teacher')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="book" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Sou Professor</h3>
+                                <p className="text-sm text-slate-500">Gerenciar projetos, turmas e rubricas.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+
+                        <button onClick={() => onEnter('student')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="rocket" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Sou Aluno</h3>
+                                <p className="text-sm text-slate-500">Ver missões, XP e enviar atividades.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+
+                        <button onClick={() => onEnter('coordinator')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="grid" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Coordenação</h3>
+                                <p className="text-sm text-slate-500">Monitorar Kanban e desempenho docente.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- MODAL DE ENVIO (Reused) ---
+        const SubmitEvidenceModal = ({ project, onClose, onSubmit }) => {
+            const [type, setType] = useState('file'); 
+            const [link, setLink] = useState('');
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(); 
+            };
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 transition-transform">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 className="font-bold text-slate-800">Enviar Entrega</h3>
+                            <button onClick={onClose} className="hover:bg-slate-200 p-1 rounded-full transition"><Icon name="x" size={20} className="text-slate-400" /></button>
+                        </div>
+                        
+                        <div className="p-6">
+                            <p className="text-sm text-slate-500 mb-4">Atividade: <strong className="text-slate-700">{project.deadlineLabel}</strong></p>
+                            <div className="flex gap-3 mb-6">
+                                <button 
+                                    onClick={() => setType('file')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'file' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                                >
+                                    <Icon name="upload" size={24} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">Arquivo</span>
+                                </button>
+                                <button 
+                                    onClick={() => setType('link')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'link' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                                >
+                                    <Icon name="link" size={24} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">Link</span>
+                                </button>
+                            </div>
+
+                            {type === 'file' ? (
+                                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition cursor-pointer group">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                                        <Icon name="upload" size={24} />
+                                    </div>
+                                    <p className="text-sm text-slate-600 font-semibold">Clique para selecionar</p>
+                                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, JPG (Max 10MB)</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">URL do Trabalho</label>
+                                    <input 
+                                        type="url" 
+                                        placeholder="https://docs.google.com/..." 
+                                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                                        value={link}
+                                        onChange={e => setLink(e.target.value)}
+                                    />
+                                    <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Icon name="check" size={12}/> Drive, YouTube, Canva suportados.</p>
+                                </div>
+                            )}
+
+                            <div className="mt-6">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Comentário</label>
+                                <textarea className="w-full p-3 border border-slate-200 rounded-lg h-24 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" placeholder="Adicione uma observação para o professor..."></textarea>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+                            <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancelar</button>
+                            <button onClick={handleSubmit} className="px-6 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md shadow-indigo-200 flex items-center gap-2 transition hover:-translate-y-0.5">
+                                Enviar Agora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SIDEBAR ---
+        const Sidebar = ({ activeTab, setActiveTab, role, onLogout }) => {
+             const getRoleLabel = () => {
+                if (role === 'teacher') return 'Professor';
+                if (role === 'student') return 'Aluno';
+                if (role === 'coordinator') return 'Coordenador';
+            };
+            
+            return (
+                <div className="w-72 bg-white h-screen fixed left-0 top-0 border-r border-slate-200 flex flex-col hidden md:flex shadow-xl z-50">
+                    <div className="p-8 flex items-center gap-3">
+                        <BrandLogo size={36} />
+                        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">BProjetos</h1>
+                    </div>
+                    
+                    <div className="px-4 flex-1 overflow-y-auto">
+                        <div className="mb-6">
+                            <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                Navegação
+                            </p>
+                            <nav className="space-y-1">
+                                <NavItem icon="home" label="Visão Geral" active={activeTab === 'dashboard' || activeTab === 'kanban' || activeTab === 'student-home'} onClick={() => {
+                                    if(role === 'coordinator') setActiveTab('kanban');
+                                    else if(role === 'student') setActiveTab('student-home');
+                                    else setActiveTab('dashboard');
+                                }} />
+                            </nav>
+                        </div>
+
+                        <div className="mb-6">
+                            <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                {role === 'teacher' ? 'Gestão' : role === 'student' ? 'Minhas Atividades' : 'Administração'}
+                            </p>
+                            <nav className="space-y-1">
+                                {role === 'teacher' && (
+                                    <>
+                                        <NavItem icon="users" label="Turmas" active={activeTab === 'classes'} onClick={() => setActiveTab('classes')} />
+                                        <NavItem icon="barChart" label="Relatórios" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+                                        <NavItem icon="clipboard" label="Rubricas" active={activeTab === 'rubrics'} onClick={() => setActiveTab('rubrics')} />
+                                    </>
+                                )}
+                                {role === 'student' && (
+                                    <>
+                                        <NavItem icon="book" label="Projetos" active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} />
+                                        <NavItem icon="calendar" label="Calendário" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+                                        <NavItem icon="award" label="Conquistas" active={activeTab === 'achievements'} onClick={() => setActiveTab('achievements')} />
+                                    </>
+                                )}
+                                {role === 'coordinator' && (
+                                    <>
+                                        <NavItem icon="grid" label="Kanban" active={activeTab === 'kanban'} onClick={() => setActiveTab('kanban')} />
+                                        <NavItem icon="users" label="Professores" active={activeTab === 'teachers'} onClick={() => setActiveTab('teachers')} />
+                                        <NavItem icon="barChart" label="Indicadores" active={activeTab === 'metrics'} onClick={() => setActiveTab('metrics')} />
+                                    </>
+                                )}
+                            </nav>
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-3 w-full hover:bg-white hover:shadow-md rounded-xl transition-all text-left group border border-transparent hover:border-slate-100">
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-red-100 group-hover:text-red-600 transition-colors">
+                                <Icon name="logout" size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-700 group-hover:text-red-600 transition-colors">Sair</p>
+                                <p className="text-xs text-slate-500">{getRoleLabel()}</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const NavItem = ({ icon, label, active, onClick }) => (
+            <button 
+                onClick={onClick}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    active 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+            >
+                <Icon name={icon} size={20} className={active ? "text-white" : "text-slate-400"} />
+                {label}
+            </button>
+        );
+
+        // --- CONTENT COMPONENTS ---
+        
+        // Professor
+        const TeacherClasses = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Minhas Turmas</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{['1º Ano A', '2º Ano B', '3º Ano C'].map((c,i)=><div key={i} className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition">
+                <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-slate-800">{c}</h3><span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">32 Alunos</span></div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 w-3/4"></div></div><p className="text-xs text-slate-400 mt-2">75% de Engajamento</p>
+            </div>)}</div></div>
+        );
+        
+        const TeacherReports = () => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-end">
+                    <div><h2 className="text-3xl font-bold text-slate-800">Relatórios BNCC</h2><p className="text-slate-500">Acompanhamento das competências desenvolvidas.</p></div>
+                    <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2 transition"><Icon name="download" size={18} /> Exportar PDF</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cobertura Total</p><p className="text-4xl font-extrabold text-indigo-600 mt-2">85%</p><p className="text-xs text-slate-500 mt-1">das competências gerais trabalhadas.</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Turma Destaque</p><p className="text-xl font-bold text-slate-800 mt-3">1º Ano A</p><p className="text-xs text-green-600 font-bold mt-1">92% de aderência</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Área de Foco</p><p className="text-xl font-bold text-slate-800 mt-3">Ciências da Natureza</p><p className="text-xs text-slate-500 mt-1">3 Projetos ativos</p></div></div>
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"><div className="p-6 border-b border-slate-100"><h3 className="font-bold text-lg text-slate-800">Matriz de Competências (Gerais)</h3></div><div className="divide-y divide-slate-100">
+                    {[{ name: "Pensamento Científico, Crítico e Criativo", progress: 90 }, { name: "Repertório Cultural", progress: 65 }, { name: "Comunicação", progress: 80 }, { name: "Cultura Digital", progress: 100 }, { name: "Trabalho e Projeto de Vida", progress: 45 }].map((comp, idx) => (
+                        <div key={idx} className="p-6 hover:bg-slate-50 transition"><div className="flex justify-between mb-2"><span className="font-medium text-slate-700 text-sm">{comp.name}</span><span className="font-bold text-indigo-600 text-sm">{comp.progress}%</span></div><div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${comp.progress}%` }}></div></div></div>))}</div></div>
+            </div>
+        );
+
+        const TeacherRubrics = () => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-800">Rubricas de Avaliação</h2>
+                        <p className="text-slate-500">Critérios para os projetos ativos.</p>
+                    </div>
+                    <button className="bg-white border border-indigo-200 text-indigo-600 px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-50 flex items-center gap-2 transition shadow-sm">
+                        <Icon name="upload" size={18} /> Importar Rubrica (Excel/CSV)
+                    </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 className="font-bold text-lg text-slate-800">Projeto: Horta Sustentável Urbana</h3>
+                        <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full">Ativo</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-white border-b border-slate-100">
+                                    <th className="px-6 py-4 font-bold text-slate-700 w-1/4">Critério & Peso</th>
+                                    <th className="px-6 py-4 font-semibold text-red-500 w-1/5">Insuficiente (1)</th>
+                                    <th className="px-6 py-4 font-semibold text-orange-500 w-1/5">Básico (2)</th>
+                                    <th className="px-6 py-4 font-semibold text-blue-500 w-1/5">Proficiente (3)</th>
+                                    <th className="px-6 py-4 font-semibold text-green-600 w-1/5">Avançado (4)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {MOCK_RUBRIC.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50 transition group">
+                                        <td className="px-6 py-6 align-top">
+                                            <p className="font-bold text-slate-800 text-base">{row.criteria}</p>
+                                            <p className="text-xs font-bold text-slate-400 uppercase mt-1">Peso: {row.weight}%</p>
+                                        </td>
+                                        {row.levels.map((level, lvlIdx) => (
+                                            <td key={lvlIdx} className="px-6 py-6 align-top text-slate-600 group-hover:text-slate-800">
+                                                {level}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const TeacherDashboard = ({ projects }) => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-end">
+                    <div><h2 className="text-3xl font-bold text-slate-800">Painel do Professor</h2><p className="text-slate-500">Visão geral dos projetos em andamento.</p></div>
+                    <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2"><Icon name="plus" size={18}/> Novo Projeto</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{projects.map(p=><div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition cursor-pointer"><div className="flex justify-between mb-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${p.theme === 'green' ? 'bg-green-100 text-green-700' : 'bg-indigo-100 text-indigo-700'}`}>{p.subject}</span></div><h3 className="font-bold text-lg text-slate-800 mb-1">{p.title}</h3><p className="text-sm text-slate-500 mb-4">{p.students} Alunos</p><div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-600 h-full" style={{width: `${p.progress}%`}}></div></div></div>)}</div>
+            </div>
+        );
+
+        // Coordinator
+        const CoordinatorKanban = ({ projects }) => (
+            <div className="animate-fade-in h-full flex flex-col">
+                <div className="mb-6"><h2 className="text-3xl font-bold text-slate-800">Kanban Geral</h2><p className="text-slate-500">Acompanhamento macro da escola.</p></div>
+                <div className="flex gap-6 overflow-x-auto pb-6 hide-scroll flex-1">
+                    {["Planejamento", "Em Andamento", "Para Avaliação", "Atrasado"].map(status => (
+                        <div key={status} className="min-w-[300px] bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col">
+                            <div className="flex justify-between items-center mb-4 px-1"><h3 className="font-bold text-xs uppercase text-slate-500 tracking-wider">{status}</h3><span className="bg-white px-2 py-0.5 rounded text-xs font-bold text-slate-400 shadow-sm">3</span></div>
+                            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                                {projects.filter(p => (status === "Atrasado" && (p.status === "Atrasado" || p.delayed)) || (p.status === status && status !== "Atrasado")).map(p => (
+                                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                                        <div className="flex items-start justify-between mb-2"><h4 className="font-bold text-sm text-slate-800 leading-tight">{p.title}</h4>{status === "Atrasado" && <Icon name="alert" size={14} className="text-red-500"/>}</div>
+                                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1"><img src={p.teacher === 'Ana Silva' ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ana' : 'https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos'} className="w-4 h-4 rounded-full"/> {p.teacher}</p>
+                                        <div className={`h-1.5 rounded-full w-full ${status==='Atrasado'?'bg-red-100':'bg-indigo-100'}`}><div className={`h-full rounded-full ${status==='Atrasado'?'bg-red-500':'bg-indigo-500'}`} style={{width:`${p.progress}%`}}></div></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+        const CoordinatorTeachersList = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Corpo Docente</h2><div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm"><table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500"><tr><th className="px-6 py-4">Nome</th><th className="px-6 py-4">Disciplina</th><th className="px-6 py-4">Engajamento</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{MOCK_TEACHERS.map(t=><tr key={t.id} className="hover:bg-slate-50 transition"><td className="px-6 py-4 font-bold text-slate-700 flex items-center gap-3"><img src={t.avatar} className="w-8 h-8 rounded-full"/>{t.name}</td><td className="px-6 py-4 text-slate-500">{t.subject}</td><td className="px-6 py-4 font-bold text-green-600">{t.rating} ★</td></tr>)}</tbody>
+            </table></div></div>
+        );
+        const CoordinatorMetrics = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Indicadores</h2><div className="grid grid-cols-3 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-sm font-bold uppercase">Conclusão</p><p className="text-4xl font-extrabold text-indigo-600 mt-2">92%</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-sm font-bold uppercase">Satisfação</p><p className="text-4xl font-extrabold text-green-500 mt-2">4.8</p></div></div></div>
+        );
+
+        // Student (Enhanced)
+        const StudentHome = ({ projects, onSendEvidence }) => (
+            <div className="animate-fade-in space-y-8">
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-3xl p-10 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
+                    <div className="relative z-10 flex justify-between items-end">
+                        <div><h2 className="text-3xl font-bold mb-2">Olá, João! 👋</h2><p className="text-indigo-100">Você tem <span className="font-bold bg-white/20 px-2 py-0.5 rounded">2 missões</span> pendentes.</p></div>
+                        <div className="text-right"><p className="text-xs font-bold uppercase opacity-70 mb-1">Nível 5</p><div className="text-4xl font-extrabold tracking-tight">1.250 XP</div></div>
+                    </div>
+                    <div className="mt-6 bg-black/20 h-2 rounded-full overflow-hidden backdrop-blur-md"><div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{width:'65%'}}></div></div>
+                    <div className="absolute -right-10 -bottom-20 opacity-20 rotate-12"><Icon name="award" size={300}/></div>
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-4">Próximas Entregas</h3>
+                    <div className="grid gap-4">{projects.map(p=><div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg ${p.theme==='green'?'bg-green-500':p.theme==='red'?'bg-red-500':'bg-indigo-500'}`}><Icon name="book" size={20}/></div>
+                            <div><h4 className="font-bold text-slate-800">{p.deadlineLabel}</h4><p className="text-sm text-slate-500">{p.title}</p></div>
+                        </div>
+                        <button onClick={()=>onSendEvidence(p)} className="px-4 py-2 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 rounded-lg font-bold text-sm transition">Enviar</button>
+                    </div>)}</div>
+                </div>
+            </div>
+        );
+        const StudentAchievements = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Sala de Troféus</h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6">{MOCK_ACHIEVEMENTS.map(a=><div key={a.id} className={`p-6 rounded-2xl border ${a.unlocked?'bg-white border-yellow-400 shadow-yellow-100 shadow-lg':'bg-slate-50 border-slate-200 grayscale opacity-60'}`}><div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4 text-xl">🏆</div><h3 className="font-bold text-slate-800">{a.title}</h3><p className="text-sm text-slate-500 mt-2">{a.desc}</p></div>)}</div></div>
+        );
+        const StudentCalendar = ({ projects }) => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Agenda</h2><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">{projects.map((p,i)=><div key={i} className="flex gap-4 border-l-4 border-indigo-500 pl-4 py-2"><div className="font-bold text-slate-800 w-12 text-center"><div className="text-xs text-slate-400 uppercase">Nov</div><div className="text-xl">12</div></div><div><h4 className="font-bold text-slate-800">{p.deadlineLabel}</h4><p className="text-sm text-slate-500">{p.title}</p></div></div>)}</div></div>
+        );
+
+        // --- APP CONTROLLER ---
+        const App = () => {
+            const [viewState, setViewState] = useState('landing');
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [role, setRole] = useState('teacher'); 
+            const [projects, setProjects] = useState(MOCK_PROJECTS);
+            
+            const [showEvidenceModal, setShowEvidenceModal] = useState(false);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+            const handleEnterApp = (selectedRole) => {
+                setRole(selectedRole);
+                setViewState('app');
+                if (selectedRole === 'coordinator') setActiveTab('kanban');
+                else if (selectedRole === 'student') setActiveTab('student-home');
+                else setActiveTab('dashboard');
+            };
+
+            const handleLogout = () => {
+                setViewState('landing');
+                setActiveTab('dashboard');
+            };
+
+            const handleOpenEvidence = (project) => {
+                setSelectedProject(project);
+                setShowEvidenceModal(true);
+            };
+
+            const handleSubmitEvidence = () => {
+                setShowEvidenceModal(false);
+                setSelectedProject(null);
+                setShowSuccessToast(true);
+                setTimeout(() => setShowSuccessToast(false), 3000);
+            };
+
+            const renderContent = () => {
+                if (role === 'teacher') {
+                    if (activeTab === 'dashboard') return <TeacherDashboard projects={projects} />;
+                    if (activeTab === 'classes') return <TeacherClasses />;
+                    if (activeTab === 'reports') return <TeacherReports />;
+                    if (activeTab === 'rubrics') return <TeacherRubrics />;
+                }
+                if (role === 'coordinator') {
+                    if (activeTab === 'kanban' || activeTab === 'dashboard') return <CoordinatorKanban projects={projects} />;
+                    if (activeTab === 'teachers') return <CoordinatorTeachersList />;
+                    if (activeTab === 'metrics') return <CoordinatorMetrics />;
+                }
+                if (role === 'student') {
+                    if (activeTab === 'student-home' || activeTab === 'projects') return <StudentHome projects={projects} onSendEvidence={handleOpenEvidence} />;
+                    if (activeTab === 'achievements') return <StudentAchievements />;
+                    if (activeTab === 'calendar') return <StudentCalendar projects={projects} />;
+                }
+                return <div className="p-8 text-center text-slate-500">Carregando...</div>;
+            };
+
+            if (viewState === 'landing') return <LandingPage onEnter={handleEnterApp} />;
+
+            return (
+                <div className="flex min-h-screen bg-slate-50">
+                    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} role={role} onLogout={handleLogout} />
+                    <main className="flex-1 md:ml-72 p-8 transition-all relative flex flex-col h-screen overflow-hidden">
+                        {showSuccessToast && (
+                            <div className="absolute top-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl shadow-2xl shadow-green-200 animate-fade-in flex items-center gap-3 z-50">
+                                <div className="bg-white/20 rounded-full p-1"><Icon name="check" size={16} /></div>
+                                <div><p className="font-bold text-sm">Sucesso!</p><p className="text-xs opacity-90">Atividade entregue.</p></div>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center mb-8">
+                            <div><h2 className="text-xs font-extrabold uppercase text-indigo-400 tracking-widest mb-1">Ambiente</h2><div className="text-sm font-bold text-slate-600 bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 inline-block">Demo v5.0</div></div>
+                            <div className="flex items-center gap-3 bg-white p-2 rounded-full shadow-sm border border-slate-100 pr-4"><img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${role}`} className="w-8 h-8 rounded-full bg-slate-100"/><div className="text-xs text-right"><p className="font-bold text-slate-700 capitalize">{role}</p></div></div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pb-20 hide-scroll">{renderContent()}</div>
+                        {showEvidenceModal && selectedProject && (
+                            <SubmitEvidenceModal project={selectedProject} onClose={() => setShowEvidenceModal(false)} onSubmit={handleSubmitEvidence} />
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BProjetos - Gestão Escolar</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F8FAFC; }
+        h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; }
+        
+        .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide-up { animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0px); } }
+        
+        /* Glassmorphism & Gradients */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .hero-gradient {
+            background: radial-gradient(circle at top left, #e0e7ff 0%, #f3e8ff 40%, #ffffff 100%);
+        }
+        
+        /* Scrollbar customizada */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 20px; width: 20px;
+            border-radius: 50%; background: #4F46E5; cursor: pointer;
+            margin-top: -8px; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer;
+            background: #E2E8F0; border-radius: 99px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- LOGO PREMIUM ---
+        const BrandLogo = ({ size = 40, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+                <defs>
+                    <linearGradient id="bookGradient" x1="0" y1="100" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#4338ca" />
+                        <stop offset="1" stopColor="#6366f1" />
+                    </linearGradient>
+                    <linearGradient id="plantGradient" x1="50" y1="100" x2="50" y2="0" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#15803d" />
+                        <stop offset="1" stopColor="#4ade80" />
+                    </linearGradient>
+                </defs>
+                <path d="M10 75 C10 75 30 85 50 75 C70 65 90 75 90 75 V 85 C90 85 70 75 50 85 C30 95 10 85 10 85 V 75 Z" fill="url(#bookGradient)" opacity="0.8"/>
+                <path d="M10 70 C10 70 30 80 50 70 C70 60 90 70 90 70 V 80 C90 80 70 70 50 80 C30 90 10 80 10 80 V 70 Z" fill="white" opacity="0.3"/>
+                <path d="M50 75 V 85" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M50 75 Q 50 50 50 30" stroke="url(#plantGradient)" strokeWidth="4" strokeLinecap="round"/>
+                <path d="M50 50 Q 70 40 80 20 Q 60 20 50 50" fill="url(#plantGradient)"/>
+                <path d="M50 40 Q 30 30 20 10 Q 40 10 50 40" fill="url(#plantGradient)" opacity="0.9"/>
+                <circle cx="20" cy="10" r="4" fill="#8b5cf6"/>
+                <circle cx="80" cy="20" r="4" fill="#8b5cf6"/>
+                <circle cx="35" cy="25" r="3" fill="#8b5cf6"/>
+                <circle cx="65" cy="30" r="3" fill="#8b5cf6"/>
+                <line x1="50" y1="40" x2="20" y2="10" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+                <line x1="50" y1="50" x2="80" y2="20" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+                <line x1="50" y1="35" x2="35" y2="25" stroke="#8b5cf6" strokeWidth="1.5" opacity="0.5"/>
+            </svg>
+        );
+
+        // --- ICONS ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                home: <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>,
+                book: <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>,
+                users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>,
+                plus: <line x1="12" y1="5" x2="12" y2="19"/>,
+                check: <polyline points="20 6 9 17 4 12"/>,
+                clock: <circle cx="12" cy="12" r="10"/>,
+                award: <circle cx="12" cy="8" r="7"/>,
+                calendar: <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>,
+                barChart: <line x1="18" y1="20" x2="18" y2="10"/>,
+                settings: <circle cx="12" cy="12" r="3"/>,
+                leaf: <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.77 10-10 10Z"/>,
+                edit: <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>,
+                x: <line x1="18" y1="6" x2="6" y2="18"/>,
+                alert: <circle cx="12" cy="12" r="10"/>,
+                grid: <rect x="3" y="3" width="7" height="7"/>,
+                rocket: <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>,
+                logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>,
+                upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>,
+                download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                link: <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>,
+                arrowRight: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
+                clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></>
+            };
+            
+            const extras = {
+                book: <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>,
+                users: <circle cx="9" cy="7" r="4"/>,
+                plus: <line x1="5" y1="12" x2="19" y2="12"/>,
+                calendar: <line x1="16" y1="2" x2="16" y2="6"/>,
+                alert: <line x1="12" y1="8" x2="12" y2="12"/>,
+                grid: <rect x="14" y="3" width="7" height="7"/>,
+                barChart: <line x1="12" y1="20" x2="12" y2="4"/>,
+                link: <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            };
+            const extras2 = {
+                 calendar: <line x1="8" y1="2" x2="8" y2="6"/>,
+                 alert: <line x1="12" y1="16" x2="12.01" y2="16"/>,
+                 grid: <rect x="14" y="14" width="7" height="7"/>,
+                 barChart: <line x1="6" y1="20" x2="6" y2="14"/>
+            };
+            const extras3 = {
+                calendar: <line x1="3" y1="10" x2="21" y2="10"/>,
+                grid: <rect x="3" y="14" width="7" height="7"/>
+            };
+
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {icons[name]}
+                    {extras[name]}
+                    {extras2[name]}
+                    {extras3[name]}
+                </svg>
+            );
+        };
+
+        // --- DADOS MOCKADOS ---
+        const MOCK_TEACHERS = [
+            { id: 1, name: "Ana Silva", subject: "Biologia", projects: 4, rating: 4.8, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ana" },
+            { id: 2, name: "Carlos Souza", subject: "História", projects: 2, rating: 4.5, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos" },
+            { id: 3, name: "Roberto Lima", subject: "Física", projects: 3, rating: 4.9, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Roberto" },
+            { id: 4, name: "Mariana Dias", subject: "Inglês", projects: 1, rating: 4.2, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mariana" }
+        ];
+
+        const MOCK_PROJECTS = [
+            { id: 1, title: "Horta Sustentável", subject: "Bio & Mat", status: "Em Andamento", progress: 65, students: 24, nextDeadline: "2023-11-12", deadlineLabel: "Relatório de Crescimento", theme: "green", teacher: "Ana Silva", delayed: false },
+            { id: 2, title: "Jornal Digital", subject: "Port & Hist", status: "Planejamento", progress: 15, students: 18, nextDeadline: "2023-11-20", deadlineLabel: "Definição de Pautas", theme: "blue", teacher: "Carlos Souza", delayed: false },
+            { id: 3, title: "Robótica Sucata", subject: "Fís & Art", status: "Para Avaliação", progress: 100, students: 30, nextDeadline: "2023-10-30", deadlineLabel: "Apresentação Final", theme: "purple", teacher: "Roberto Lima", delayed: false },
+            { id: 4, title: "Teatro Shake", subject: "Lit & Ing", status: "Atrasado", progress: 40, students: 22, nextDeadline: "2023-10-15", deadlineLabel: "Ensaios Gerais", theme: "red", teacher: "Mariana Dias", delayed: true }
+        ];
+
+        const MOCK_ACHIEVEMENTS = [
+            { id: 1, title: "Pontualidade Britânica", desc: "Entregar 3 tarefas antes do prazo final.", xp: 500, progress: 2, total: 3, icon: "clock" },
+            { id: 2, title: "Mestre da BNCC", desc: "Completar todas as competências de um projeto.", xp: 1000, progress: 8, total: 10, icon: "award" },
+            { id: 3, title: "Colaborador", desc: "Participar de 2 projetos em grupo.", xp: 300, progress: 2, total: 2, icon: "users", unlocked: true }
+        ];
+
+        const MOCK_RUBRIC = [
+            { criteria: "Investigação Científica", weight: 40, levels: ["Não apresentou dados.", "Dados superficiais.", "Dados relevantes e bem analisados.", "Análise profunda com fontes extras."] },
+            { criteria: "Trabalho em Equipe", weight: 30, levels: ["Conflitos constantes.", "Colaboração mínima.", "Boa divisão de tarefas.", "Sinergia e apoio mútuo."] },
+            { criteria: "Comunicação Oral", weight: 30, levels: ["Leitura de slides.", "Fala pouco clara.", "Boa oratória.", "Apresentação engajadora e profissional."] }
+        ];
+
+        // --- LANDING PAGE PREMIUM ---
+        const LandingPage = ({ onEnter }) => (
+            <div className="min-h-screen hero-gradient flex flex-col relative overflow-hidden">
+                {/* Decorative Blobs */}
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-300/30 rounded-full blur-3xl mix-blend-multiply filter animate-float -z-10"></div>
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-300/30 rounded-full blur-3xl mix-blend-multiply filter animate-float -z-10" style={{animationDelay: "2s"}}></div>
+
+                {/* Navbar */}
+                <nav className="px-8 py-6 flex justify-between items-center max-w-7xl mx-auto w-full">
+                    <div className="flex items-center gap-3">
+                        <BrandLogo size={40} />
+                        <span className="text-2xl font-bold text-slate-800 tracking-tight">BProjetos</span>
+                    </div>
+                    <div className="hidden md:flex gap-6 text-sm font-semibold text-slate-600">
+                        <a href="#" className="hover:text-indigo-600 transition">Sobre</a>
+                        <a href="#" className="hover:text-indigo-600 transition">Recursos</a>
+                        <a href="#" className="hover:text-indigo-600 transition">Preços</a>
+                    </div>
+                    <button className="px-6 py-2.5 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 text-sm">
+                        Agendar Demo
+                    </button>
+                </nav>
+
+                {/* Hero Content */}
+                <div className="flex-1 flex flex-col md:flex-row items-center justify-center max-w-7xl mx-auto w-full px-6 md:px-12 gap-12 py-12">
+                    
+                    {/* Left Text */}
+                    <div className="md:w-1/2 animate-slide-up space-y-8">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-sm font-bold">
+                            <span className="relative flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                            </span>
+                            Plataforma #1 para Escolas Inovadoras
+                        </div>
+                        
+                        <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight">
+                            Projetos que <br/>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Engajam Alunos</span>
+                        </h1>
+                        
+                        <p className="text-xl text-slate-600 leading-relaxed max-w-lg">
+                            Centralize a gestão pedagógica, automatize o acompanhamento da BNCC e transforme atividades escolares em experiências gamificadas.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                            <div className="flex items-center gap-[-10px]">
+                                <div className="flex -space-x-4">
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt=""/>
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ane" alt=""/>
+                                    <img className="w-10 h-10 rounded-full border-2 border-white" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Bob" alt=""/>
+                                </div>
+                                <span className="ml-6 text-sm font-bold text-slate-600">+500 Escolas usam</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Login Cards */}
+                    <div className="md:w-1/2 w-full grid gap-4 animate-slide-up" style={{animationDelay: "0.2s"}}>
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">Acesso Rápido (Ambiente Demo)</p>
+                        
+                        <button onClick={() => onEnter('teacher')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="book" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Sou Professor</h3>
+                                <p className="text-sm text-slate-500">Gerenciar projetos, turmas e rubricas.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+
+                        <button onClick={() => onEnter('student')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="rocket" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Sou Aluno</h3>
+                                <p className="text-sm text-slate-500">Ver missões, XP e enviar atividades.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+
+                        <button onClick={() => onEnter('coordinator')} className="glass-card p-6 rounded-2xl flex items-center gap-6 hover:scale-[1.02] transition-all shadow-sm hover:shadow-xl group cursor-pointer text-left">
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white shadow-lg group-hover:rotate-6 transition-transform">
+                                <Icon name="grid" size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-800">Coordenação</h3>
+                                <p className="text-sm text-slate-500">Monitorar Kanban e desempenho docente.</p>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                <Icon name="arrowRight" size={16} />
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- MODAL DE ENVIO (Reused) ---
+        const SubmitEvidenceModal = ({ project, onClose, onSubmit }) => {
+            const [type, setType] = useState('file'); 
+            const [link, setLink] = useState('');
+            
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(); 
+            };
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 transition-transform">
+                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 className="font-bold text-slate-800">Enviar Entrega</h3>
+                            <button onClick={onClose} className="hover:bg-slate-200 p-1 rounded-full transition"><Icon name="x" size={20} className="text-slate-400" /></button>
+                        </div>
+                        
+                        <div className="p-6">
+                            <p className="text-sm text-slate-500 mb-4">Atividade: <strong className="text-slate-700">{project.deadlineLabel}</strong></p>
+                            <div className="flex gap-3 mb-6">
+                                <button 
+                                    onClick={() => setType('file')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'file' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                                >
+                                    <Icon name="upload" size={24} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">Arquivo</span>
+                                </button>
+                                <button 
+                                    onClick={() => setType('link')}
+                                    className={`flex-1 py-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${type === 'link' ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-inner' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                                >
+                                    <Icon name="link" size={24} />
+                                    <span className="text-xs font-bold uppercase tracking-wide">Link</span>
+                                </button>
+                            </div>
+
+                            {type === 'file' ? (
+                                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition cursor-pointer group">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                                        <Icon name="upload" size={24} />
+                                    </div>
+                                    <p className="text-sm text-slate-600 font-semibold">Clique para selecionar</p>
+                                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, JPG (Max 10MB)</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">URL do Trabalho</label>
+                                    <input 
+                                        type="url" 
+                                        placeholder="https://docs.google.com/..." 
+                                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                                        value={link}
+                                        onChange={e => setLink(e.target.value)}
+                                    />
+                                    <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Icon name="check" size={12}/> Drive, YouTube, Canva suportados.</p>
+                                </div>
+                            )}
+
+                            <div className="mt-6">
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Comentário</label>
+                                <textarea className="w-full p-3 border border-slate-200 rounded-lg h-24 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" placeholder="Adicione uma observação para o professor..."></textarea>
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3 border-t border-slate-100">
+                            <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancelar</button>
+                            <button onClick={handleSubmit} className="px-6 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md shadow-indigo-200 flex items-center gap-2 transition hover:-translate-y-0.5">
+                                Enviar Agora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SIDEBAR ---
+        const Sidebar = ({ activeTab, setActiveTab, role, onLogout }) => {
+             const getRoleLabel = () => {
+                if (role === 'teacher') return 'Professor';
+                if (role === 'student') return 'Aluno';
+                if (role === 'coordinator') return 'Coordenador';
+            };
+            
+            return (
+                <div className="w-72 bg-white h-screen fixed left-0 top-0 border-r border-slate-200 flex flex-col hidden md:flex shadow-xl z-50">
+                    <div className="p-8 flex items-center gap-3">
+                        <BrandLogo size={36} />
+                        <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">BProjetos</h1>
+                    </div>
+                    
+                    <div className="px-4 flex-1 overflow-y-auto">
+                        <div className="mb-6">
+                            <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                Navegação
+                            </p>
+                            <nav className="space-y-1">
+                                <NavItem icon="home" label="Visão Geral" active={activeTab === 'dashboard' || activeTab === 'kanban' || activeTab === 'student-home'} onClick={() => {
+                                    if(role === 'coordinator') setActiveTab('kanban');
+                                    else if(role === 'student') setActiveTab('student-home');
+                                    else setActiveTab('dashboard');
+                                }} />
+                            </nav>
+                        </div>
+
+                        <div className="mb-6">
+                            <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                {role === 'teacher' ? 'Gestão' : role === 'student' ? 'Minhas Atividades' : 'Administração'}
+                            </p>
+                            <nav className="space-y-1">
+                                {role === 'teacher' && (
+                                    <>
+                                        <NavItem icon="users" label="Turmas" active={activeTab === 'classes'} onClick={() => setActiveTab('classes')} />
+                                        <NavItem icon="barChart" label="Relatórios" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+                                        <NavItem icon="clipboard" label="Rubricas" active={activeTab === 'rubrics'} onClick={() => setActiveTab('rubrics')} />
+                                    </>
+                                )}
+                                {role === 'student' && (
+                                    <>
+                                        <NavItem icon="book" label="Projetos" active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} />
+                                        <NavItem icon="calendar" label="Calendário" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+                                        <NavItem icon="award" label="Conquistas" active={activeTab === 'achievements'} onClick={() => setActiveTab('achievements')} />
+                                    </>
+                                )}
+                                {role === 'coordinator' && (
+                                    <>
+                                        <NavItem icon="grid" label="Kanban" active={activeTab === 'kanban'} onClick={() => setActiveTab('kanban')} />
+                                        <NavItem icon="users" label="Professores" active={activeTab === 'teachers'} onClick={() => setActiveTab('teachers')} />
+                                        <NavItem icon="barChart" label="Indicadores" active={activeTab === 'metrics'} onClick={() => setActiveTab('metrics')} />
+                                    </>
+                                )}
+                            </nav>
+                        </div>
+                    </div>
+
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                        <button onClick={onLogout} className="flex items-center gap-3 px-3 py-3 w-full hover:bg-white hover:shadow-md rounded-xl transition-all text-left group border border-transparent hover:border-slate-100">
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:bg-red-100 group-hover:text-red-600 transition-colors">
+                                <Icon name="logout" size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-700 group-hover:text-red-600 transition-colors">Sair</p>
+                                <p className="text-xs text-slate-500">{getRoleLabel()}</p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const NavItem = ({ icon, label, active, onClick }) => (
+            <button 
+                onClick={onClick}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                    active 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+            >
+                <Icon name={icon} size={20} className={active ? "text-white" : "text-slate-400"} />
+                {label}
+            </button>
+        );
+
+        // --- CONTENT COMPONENTS ---
+        
+        // Professor
+        const TeacherClasses = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Minhas Turmas</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{['1º Ano A', '2º Ano B', '3º Ano C'].map((c,i)=><div key={i} className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition">
+                <div className="flex justify-between mb-4"><h3 className="text-xl font-bold text-slate-800">{c}</h3><span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">32 Alunos</span></div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 w-3/4"></div></div><p className="text-xs text-slate-400 mt-2">75% de Engajamento</p>
+            </div>)}</div></div>
+        );
+        
+        const TeacherReports = () => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-end">
+                    <div><h2 className="text-3xl font-bold text-slate-800">Relatórios BNCC</h2><p className="text-slate-500">Acompanhamento das competências desenvolvidas.</p></div>
+                    <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2 transition"><Icon name="download" size={18} /> Exportar PDF</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Cobertura Total</p><p className="text-4xl font-extrabold text-indigo-600 mt-2">85%</p><p className="text-xs text-slate-500 mt-1">das competências gerais trabalhadas.</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Turma Destaque</p><p className="text-xl font-bold text-slate-800 mt-3">1º Ano A</p><p className="text-xs text-green-600 font-bold mt-1">92% de aderência</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Área de Foco</p><p className="text-xl font-bold text-slate-800 mt-3">Ciências da Natureza</p><p className="text-xs text-slate-500 mt-1">3 Projetos ativos</p></div></div>
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden"><div className="p-6 border-b border-slate-100"><h3 className="font-bold text-lg text-slate-800">Matriz de Competências (Gerais)</h3></div><div className="divide-y divide-slate-100">
+                    {[{ name: "Pensamento Científico, Crítico e Criativo", progress: 90 }, { name: "Repertório Cultural", progress: 65 }, { name: "Comunicação", progress: 80 }, { name: "Cultura Digital", progress: 100 }, { name: "Trabalho e Projeto de Vida", progress: 45 }].map((comp, idx) => (
+                        <div key={idx} className="p-6 hover:bg-slate-50 transition"><div className="flex justify-between mb-2"><span className="font-medium text-slate-700 text-sm">{comp.name}</span><span className="font-bold text-indigo-600 text-sm">{comp.progress}%</span></div><div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-500 h-full rounded-full" style={{ width: `${comp.progress}%` }}></div></div></div>))}</div></div>
+            </div>
+        );
+
+        const TeacherRubrics = () => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-800">Rubricas de Avaliação</h2>
+                        <p className="text-slate-500">Critérios para os projetos ativos.</p>
+                    </div>
+                    <button className="bg-white border border-indigo-200 text-indigo-600 px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-50 flex items-center gap-2 transition shadow-sm">
+                        <Icon name="upload" size={18} /> Importar Rubrica (Excel/CSV)
+                    </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 className="font-bold text-lg text-slate-800">Projeto: Horta Sustentável Urbana</h3>
+                        <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full">Ativo</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-white border-b border-slate-100">
+                                    <th className="px-6 py-4 font-bold text-slate-700 w-1/4">Critério & Peso</th>
+                                    <th className="px-6 py-4 font-semibold text-red-500 w-1/5">Insuficiente (1)</th>
+                                    <th className="px-6 py-4 font-semibold text-orange-500 w-1/5">Básico (2)</th>
+                                    <th className="px-6 py-4 font-semibold text-blue-500 w-1/5">Proficiente (3)</th>
+                                    <th className="px-6 py-4 font-semibold text-green-600 w-1/5">Avançado (4)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {MOCK_RUBRIC.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50 transition group">
+                                        <td className="px-6 py-6 align-top">
+                                            <p className="font-bold text-slate-800 text-base">{row.criteria}</p>
+                                            <p className="text-xs font-bold text-slate-400 uppercase mt-1">Peso: {row.weight}%</p>
+                                        </td>
+                                        {row.levels.map((level, lvlIdx) => (
+                                            <td key={lvlIdx} className="px-6 py-6 align-top text-slate-600 group-hover:text-slate-800">
+                                                {level}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const TeacherDashboard = ({ projects }) => (
+            <div className="animate-fade-in space-y-8">
+                <div className="flex justify-between items-end">
+                    <div><h2 className="text-3xl font-bold text-slate-800">Painel do Professor</h2><p className="text-slate-500">Visão geral dos projetos em andamento.</p></div>
+                    <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center gap-2"><Icon name="plus" size={18}/> Novo Projeto</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{projects.map(p=><div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition cursor-pointer"><div className="flex justify-between mb-4"><span className={`px-3 py-1 rounded-full text-xs font-bold ${p.theme === 'green' ? 'bg-green-100 text-green-700' : 'bg-indigo-100 text-indigo-700'}`}>{p.subject}</span></div><h3 className="font-bold text-lg text-slate-800 mb-1">{p.title}</h3><p className="text-sm text-slate-500 mb-4">{p.students} Alunos</p><div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-600 h-full" style={{width: `${p.progress}%`}}></div></div></div>)}</div>
+            </div>
+        );
+
+        // Coordinator
+        const CoordinatorKanban = ({ projects }) => (
+            <div className="animate-fade-in h-full flex flex-col">
+                <div className="mb-6"><h2 className="text-3xl font-bold text-slate-800">Kanban Geral</h2><p className="text-slate-500">Acompanhamento macro da escola.</p></div>
+                <div className="flex gap-6 overflow-x-auto pb-6 hide-scroll flex-1">
+                    {["Planejamento", "Em Andamento", "Para Avaliação", "Atrasado"].map(status => (
+                        <div key={status} className="min-w-[300px] bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col">
+                            <div className="flex justify-between items-center mb-4 px-1"><h3 className="font-bold text-xs uppercase text-slate-500 tracking-wider">{status}</h3><span className="bg-white px-2 py-0.5 rounded text-xs font-bold text-slate-400 shadow-sm">3</span></div>
+                            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                                {projects.filter(p => (status === "Atrasado" && (p.status === "Atrasado" || p.delayed)) || (p.status === status && status !== "Atrasado")).map(p => (
+                                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                                        <div className="flex items-start justify-between mb-2"><h4 className="font-bold text-sm text-slate-800 leading-tight">{p.title}</h4>{status === "Atrasado" && <Icon name="alert" size={14} className="text-red-500"/>}</div>
+                                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1"><img src={p.teacher === 'Ana Silva' ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ana' : 'https://api.dicebear.com/7.x/avataaars/svg?seed=Carlos'} className="w-4 h-4 rounded-full"/> {p.teacher}</p>
+                                        <div className={`h-1.5 rounded-full w-full ${status==='Atrasado'?'bg-red-100':'bg-indigo-100'}`}><div className={`h-full rounded-full ${status==='Atrasado'?'bg-red-500':'bg-indigo-500'}`} style={{width:`${p.progress}%`}}></div></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+        const CoordinatorTeachersList = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Corpo Docente</h2><div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm"><table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500"><tr><th className="px-6 py-4">Nome</th><th className="px-6 py-4">Disciplina</th><th className="px-6 py-4">Engajamento</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{MOCK_TEACHERS.map(t=><tr key={t.id} className="hover:bg-slate-50 transition"><td className="px-6 py-4 font-bold text-slate-700 flex items-center gap-3"><img src={t.avatar} className="w-8 h-8 rounded-full"/>{t.name}</td><td className="px-6 py-4 text-slate-500">{t.subject}</td><td className="px-6 py-4 font-bold text-green-600">{t.rating} ★</td></tr>)}</tbody>
+            </table></div></div>
+        );
+        const CoordinatorMetrics = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Indicadores</h2><div className="grid grid-cols-3 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-sm font-bold uppercase">Conclusão</p><p className="text-4xl font-extrabold text-indigo-600 mt-2">92%</p></div><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm"><p className="text-slate-400 text-sm font-bold uppercase">Satisfação</p><p className="text-4xl font-extrabold text-green-500 mt-2">4.8</p></div></div></div>
+        );
+
+        // Student (Enhanced)
+        const StudentHome = ({ projects, onSendEvidence }) => (
+            <div className="animate-fade-in space-y-8">
+                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-3xl p-10 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
+                    <div className="relative z-10 flex justify-between items-end">
+                        <div><h2 className="text-3xl font-bold mb-2">Olá, João! 👋</h2><p className="text-indigo-100">Você tem <span className="font-bold bg-white/20 px-2 py-0.5 rounded">2 missões</span> pendentes.</p></div>
+                        <div className="text-right"><p className="text-xs font-bold uppercase opacity-70 mb-1">Nível 5</p><div className="text-4xl font-extrabold tracking-tight">1.250 XP</div></div>
+                    </div>
+                    <div className="mt-6 bg-black/20 h-2 rounded-full overflow-hidden backdrop-blur-md"><div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{width:'65%'}}></div></div>
+                    <div className="absolute -right-10 -bottom-20 opacity-20 rotate-12"><Icon name="award" size={300}/></div>
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-4">Próximas Entregas</h3>
+                    <div className="grid gap-4">{projects.map(p=><div key={p.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg ${p.theme==='green'?'bg-green-500':p.theme==='red'?'bg-red-500':'bg-indigo-500'}`}><Icon name="book" size={20}/></div>
+                            <div><h4 className="font-bold text-slate-800">{p.deadlineLabel}</h4><p className="text-sm text-slate-500">{p.title}</p></div>
+                        </div>
+                        <button onClick={()=>onSendEvidence(p)} className="px-4 py-2 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 rounded-lg font-bold text-sm transition">Enviar</button>
+                    </div>)}</div>
+                </div>
+            </div>
+        );
+        const StudentAchievements = () => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Sala de Troféus</h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6">{MOCK_ACHIEVEMENTS.map(a=><div key={a.id} className={`p-6 rounded-2xl border ${a.unlocked?'bg-white border-yellow-400 shadow-yellow-100 shadow-lg':'bg-slate-50 border-slate-200 grayscale opacity-60'}`}><div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4 text-xl">🏆</div><h3 className="font-bold text-slate-800">{a.title}</h3><p className="text-sm text-slate-500 mt-2">{a.desc}</p></div>)}</div></div>
+        );
+        const StudentCalendar = ({ projects }) => (
+            <div className="animate-fade-in"><h2 className="text-3xl font-bold text-slate-800 mb-8">Agenda</h2><div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">{projects.map((p,i)=><div key={i} className="flex gap-4 border-l-4 border-indigo-500 pl-4 py-2"><div className="font-bold text-slate-800 w-12 text-center"><div className="text-xs text-slate-400 uppercase">Nov</div><div className="text-xl">12</div></div><div><h4 className="font-bold text-slate-800">{p.deadlineLabel}</h4><p className="text-sm text-slate-500">{p.title}</p></div></div>)}</div></div>
+        );
+
+        // --- APP CONTROLLER ---
+        const App = () => {
+            const [viewState, setViewState] = useState('landing');
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [role, setRole] = useState('teacher'); 
+            const [projects, setProjects] = useState(MOCK_PROJECTS);
+            
+            const [showEvidenceModal, setShowEvidenceModal] = useState(false);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+            const handleEnterApp = (selectedRole) => {
+                setRole(selectedRole);
+                setViewState('app');
+                if (selectedRole === 'coordinator') setActiveTab('kanban');
+                else if (selectedRole === 'student') setActiveTab('student-home');
+                else setActiveTab('dashboard');
+            };
+
+            const handleLogout = () => {
+                setViewState('landing');
+                setActiveTab('dashboard');
+            };
+
+            const handleOpenEvidence = (project) => {
+                setSelectedProject(project);
+                setShowEvidenceModal(true);
+            };
+
+            const handleSubmitEvidence = () => {
+                setShowEvidenceModal(false);
+                setSelectedProject(null);
+                setShowSuccessToast(true);
+                setTimeout(() => setShowSuccessToast(false), 3000);
+            };
+
+            const renderContent = () => {
+                if (role === 'teacher') {
+                    if (activeTab === 'dashboard') return <TeacherDashboard projects={projects} />;
+                    if (activeTab === 'classes') return <TeacherClasses />;
+                    if (activeTab === 'reports') return <TeacherReports />;
+                    if (activeTab === 'rubrics') return <TeacherRubrics />;
+                }
+                if (role === 'coordinator') {
+                    if (activeTab === 'kanban' || activeTab === 'dashboard') return <CoordinatorKanban projects={projects} />;
+                    if (activeTab === 'teachers') return <CoordinatorTeachersList />;
+                    if (activeTab === 'metrics') return <CoordinatorMetrics />;
+                }
+                if (role === 'student') {
+                    if (activeTab === 'student-home' || activeTab === 'projects') return <StudentHome projects={projects} onSendEvidence={handleOpenEvidence} />;
+                    if (activeTab === 'achievements') return <StudentAchievements />;
+                    if (activeTab === 'calendar') return <StudentCalendar projects={projects} />;
+                }
+                return <div className="p-8 text-center text-slate-500">Carregando...</div>;
+            };
+
+            if (viewState === 'landing') return <LandingPage onEnter={handleEnterApp} />;
+
+            return (
+                <div className="flex min-h-screen bg-slate-50">
+                    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} role={role} onLogout={handleLogout} />
+                    <main className="flex-1 md:ml-72 p-8 transition-all relative flex flex-col h-screen overflow-hidden">
+                        {showSuccessToast && (
+                            <div className="absolute top-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl shadow-2xl shadow-green-200 animate-fade-in flex items-center gap-3 z-50">
+                                <div className="bg-white/20 rounded-full p-1"><Icon name="check" size={16} /></div>
+                                <div><p className="font-bold text-sm">Sucesso!</p><p className="text-xs opacity-90">Atividade entregue.</p></div>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center mb-8">
+                            <div><h2 className="text-xs font-extrabold uppercase text-indigo-400 tracking-widest mb-1">Ambiente</h2><div className="text-sm font-bold text-slate-600 bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 inline-block">Demo v5.0</div></div>
+                            <div className="flex items-center gap-3 bg-white p-2 rounded-full shadow-sm border border-slate-100 pr-4"><img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${role}`} className="w-8 h-8 rounded-full bg-slate-100"/><div className="text-xs text-right"><p className="font-bold text-slate-700 capitalize">{role}</p></div></div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pb-20 hide-scroll">{renderContent()}</div>
+                        {showEvidenceModal && selectedProject && (
+                            <SubmitEvidenceModal project={selectedProject} onClose={() => setShowEvidenceModal(false)} onSubmit={handleSubmitEvidence} />
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
