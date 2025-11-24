@@ -1,5 +1,6 @@
+import { Link } from "wouter";
 import { Icon } from "./Icon";
-import { ProjectDetailsModal } from "./ProjectDetailsModal";
+import { Button } from "./ui/button";
 import type { ProjectWithTeacher } from "@shared/schema";
 
 interface ProjectCardProps {
@@ -69,15 +70,18 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false, showD
       )}
 
       {showDetailsButton && !showSubmitButton && (
-        <ProjectDetailsModal project={project}>
-          <button 
-            data-testid={`button-details-${project.id}`}
-            className="w-full bg-background border border-primary/20 text-primary px-4 py-3 rounded-lg font-semibold hover-elevate transition flex items-center justify-center gap-2"
-          >
-            <Icon name="eye" size={18} />
-            Ver Detalhes
-          </button>
-        </ProjectDetailsModal>
+        <Link href={`/project/${project.id}`}>
+          <a className="w-full">
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+              data-testid={`button-details-${project.id}`}
+            >
+              <Icon name="eye" size={18} />
+              Ver Detalhes
+            </Button>
+          </a>
+        </Link>
       )}
 
       {showSubmitButton && onSubmit && (

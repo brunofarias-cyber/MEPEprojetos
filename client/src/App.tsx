@@ -13,6 +13,7 @@ import Register from "@/pages/register";
 
 // Teacher views
 import TeacherDashboard from "@/pages/teacher/dashboard";
+import TeacherProjectDetail from "@/pages/teacher/project-detail";
 import TeacherClasses from "@/pages/teacher/classes";
 import TeacherReports from "@/pages/teacher/reports";
 import TeacherRubrics from "@/pages/teacher/rubrics";
@@ -74,6 +75,8 @@ function ProtectedRoutes() {
                 {user.role === 'teacher' && (
                   <>
                     <Route path="/" component={TeacherDashboard} />
+                    <Route path="/teacher/dashboard" component={TeacherDashboard} />
+                    <Route path="/project/:id" component={TeacherProjectDetail} />
                     <Route path="/classes" component={TeacherClasses} />
                     <Route path="/reports" component={TeacherReports} />
                     <Route path="/rubrics" component={TeacherRubrics} />
