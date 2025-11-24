@@ -97,6 +97,22 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/feedbacks'}>
+                      <Link href="/feedbacks" data-testid="nav-feedbacks">
+                        <Icon name="messageSquare" size={20} />
+                        <span>Feedbacks</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/calendar'}>
+                      <Link href="/calendar" data-testid="nav-calendario">
+                        <Icon name="calendar" size={20} />
+                        <span>Calendário</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </>
               )}
               {role === 'student' && (
