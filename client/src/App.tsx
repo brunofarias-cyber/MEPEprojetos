@@ -16,6 +16,7 @@ import TeacherDashboard from "@/pages/teacher/dashboard";
 import TeacherClasses from "@/pages/teacher/classes";
 import TeacherReports from "@/pages/teacher/reports";
 import TeacherRubrics from "@/pages/teacher/rubrics";
+import TeacherBncc from "@/pages/teacher/bncc";
 
 // Student views
 import StudentHome from "@/pages/student/home";
@@ -73,6 +74,7 @@ function ProtectedRoutes() {
                     <Route path="/classes" component={TeacherClasses} />
                     <Route path="/reports" component={TeacherReports} />
                     <Route path="/rubrics" component={TeacherRubrics} />
+                    <Route path="/bncc" component={TeacherBncc} />
                   </>
                 )}
 

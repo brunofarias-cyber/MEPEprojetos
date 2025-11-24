@@ -1,13 +1,15 @@
 import { Icon } from "./Icon";
+import { ProjectDetailsModal } from "./ProjectDetailsModal";
 import type { ProjectWithTeacher } from "@shared/schema";
 
 interface ProjectCardProps {
   project: ProjectWithTeacher;
   onSubmit?: () => void;
   showSubmitButton?: boolean;
+  showDetailsButton?: boolean;
 }
 
-export function ProjectCard({ project, onSubmit, showSubmitButton = false }: ProjectCardProps) {
+export function ProjectCard({ project, onSubmit, showSubmitButton = false, showDetailsButton = true }: ProjectCardProps) {
   const getThemeColors = (theme: string) => {
     const themes = {
       green: 'from-green-500 to-emerald-500',
@@ -66,6 +68,18 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false }: Pro
         </div>
       )}
 
+      {showDetailsButton && !showSubmitButton && (
+        <ProjectDetailsModal project={project}>
+          <button 
+            data-testid={`button-details-${project.id}`}
+            className="w-full bg-background border border-primary/20 text-primary px-4 py-3 rounded-lg font-semibold hover-elevate transition flex items-center justify-center gap-2"
+          >
+            <Icon name="eye" size={18} />
+            Ver Detalhes
+          </button>
+        </ProjectDetailsModal>
+      )}
+
       {showSubmitButton && onSubmit && (
         <button 
           onClick={onSubmit}
@@ -77,7 +91,7 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false }: Pro
         </button>
       )}
 
-      {!showSubmitButton && project.teacherName && (
+      {!showSubmitButton && !showDetailsButton && project.teacherName && (
         <div className="flex items-center gap-2 pt-4 border-t border-border">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
             <Icon name="book" size={16} className="text-primary" />

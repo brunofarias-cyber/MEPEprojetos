@@ -543,6 +543,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(classes);
   });
 
+  // BNCC Competencies Routes (All authenticated users can view)
+  app.get("/api/bncc-competencies", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const competencies = await storage.getCompetencies();
+    res.json(competencies);
+  });
+
   // BNCC Document Routes (Coordinator-only)
   app.get("/api/bncc-documents", async (req, res) => {
     // Validate authentication

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { useAuth } from "@/contexts/AuthContext";
+import { CreateClassModal } from "@/components/CreateClassModal";
 import type { Class } from "@shared/schema";
 
 export default function TeacherClasses() {
@@ -15,7 +16,9 @@ export default function TeacherClasses() {
   if (!teacherId) {
     return (
       <div className="animate-fade-in">
-        <h2 className="text-3xl font-bold text-foreground mb-8" data-testid="heading-classes">Minhas Turmas</h2>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
+        </div>
         <div className="bg-card border border-card-border p-12 rounded-2xl text-center">
           <p className="text-lg text-muted-foreground">Dados do professor não encontrados</p>
         </div>
@@ -26,7 +29,10 @@ export default function TeacherClasses() {
   if (isLoading) {
     return (
       <div className="animate-fade-in">
-        <h2 className="text-3xl font-bold text-foreground mb-8" data-testid="heading-classes">Minhas Turmas</h2>
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
+          <CreateClassModal />
+        </div>
         <div className="flex justify-center items-center h-64">
           <div className="text-muted-foreground">Carregando turmas...</div>
         </div>
@@ -36,7 +42,10 @@ export default function TeacherClasses() {
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-3xl font-bold text-foreground mb-8" data-testid="heading-classes">Minhas Turmas</h2>
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
+        <CreateClassModal />
+      </div>
       
       {classes.length === 0 ? (
         <div className="bg-card border border-card-border p-12 rounded-2xl text-center">

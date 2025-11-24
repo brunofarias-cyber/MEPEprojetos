@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
+import { ImportRubricModal } from "@/components/ImportRubricModal";
 import type { RubricCriteria, ProjectWithTeacher } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function TeacherRubrics() {
+  const { toast } = useToast();
+  
   // Fetch projects to allow selection
   const { data: projects = [] } = useQuery<ProjectWithTeacher[]>({
     queryKey: ['/api/projects'],
   });
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [editingCriteria, setEditingCriteria] = useState<Record<string, Partial<RubricCriteria>>>({});
 
   // Set selectedProjectId once projects are loaded
   useEffect(() => {
@@ -26,6 +32,51 @@ export default function TeacherRubrics() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
+  // Update weight mutation
+  const updateWeightMutation = useMutation({
+    mutationFn: async ({ criteriaId, weight }: { criteriaId: string; weight: number }) => {
+      return apiRequest(`/api/rubrics/${criteriaId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ weight }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/rubrics/${selectedProjectId}`] });
+      toast({
+        title: "Peso atualizado",
+        description: "O peso do critério foi atualizado com sucesso.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível atualizar o peso do critério.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleWeightChange = (criteriaId: string, newWeight: number) => {
+    setEditingCriteria(prev => ({
+      ...prev,
+      [criteriaId]: { ...prev[criteriaId], weight: newWeight }
+    }));
+  };
+
+  const handleWeightBlur = (criteriaId: string) => {
+    const editedCriteria = editingCriteria[criteriaId];
+    if (editedCriteria?.weight !== undefined) {
+      updateWeightMutation.mutate({ criteriaId, weight: editedCriteria.weight });
+    }
+  };
+
+  const getTotalWeight = () => {
+    return projectRubrics.reduce((sum, c) => {
+      const editedWeight = editingCriteria[c.id]?.weight;
+      return sum + (editedWeight !== undefined ? editedWeight : c.weight);
+    }, 0);
+  };
+
   return (
     <div className="animate-fade-in space-y-8">
       <div className="flex justify-between items-center">
@@ -33,9 +84,7 @@ export default function TeacherRubrics() {
           <h2 className="text-3xl font-bold text-foreground" data-testid="heading-rubrics">Rubricas de Avaliação</h2>
           <p className="text-muted-foreground">Critérios para os projetos ativos.</p>
         </div>
-        <button className="bg-background border border-primary/20 text-primary px-5 py-2.5 rounded-xl font-semibold hover-elevate flex items-center gap-2 transition shadow-sm" data-testid="button-import-rubric">
-          <Icon name="upload" size={18} /> Importar Rubrica (Excel/CSV)
-        </button>
+        <ImportRubricModal />
       </div>
 
       {/* Project Selection */}
@@ -101,12 +150,23 @@ export default function TeacherRubrics() {
                             type="range" 
                             min="0" 
                             max="100" 
-                            value={criteria.weight}
-                            className="flex-1"
+                            value={editingCriteria[criteria.id]?.weight ?? criteria.weight}
+                            onChange={(e) => handleWeightChange(criteria.id, parseInt(e.target.value))}
+                            onMouseUp={() => handleWeightBlur(criteria.id)}
+                            className="flex-1 cursor-pointer"
                             data-testid={`slider-weight-${criteria.id}`}
-                            disabled
                           />
-                          <span className="font-bold text-primary w-12 text-right" data-testid={`text-weight-${criteria.id}`}>{criteria.weight}%</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={editingCriteria[criteria.id]?.weight ?? criteria.weight}
+                            onChange={(e) => handleWeightChange(criteria.id, parseInt(e.target.value) || 0)}
+                            onBlur={() => handleWeightBlur(criteria.id)}
+                            className="font-bold text-primary w-16 text-right bg-transparent border border-border rounded px-2 py-1"
+                            data-testid={`input-weight-${criteria.id}`}
+                          />
+                          <span className="text-muted-foreground">%</span>
                         </div>
                       </td>
                       <td className="px-6 py-6">
@@ -142,11 +202,19 @@ export default function TeacherRubrics() {
 
           <div className="px-6 py-4 bg-muted/30 border-t border-border flex justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              Total de Pesos: <strong className="text-foreground">{projectRubrics.reduce((sum, c) => sum + c.weight, 0)}%</strong>
+              Total de Pesos: <strong className={getTotalWeight() === 100 ? "text-green-600" : getTotalWeight() > 100 ? "text-destructive" : "text-foreground"}>{getTotalWeight()}%</strong>
+              {getTotalWeight() !== 100 && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (deve somar 100%)
+                </span>
+              )}
             </p>
-            <button className="bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-semibold hover:bg-primary/90 shadow-md flex items-center gap-2 transition" data-testid="button-save-rubric">
-              <Icon name="check" size={18} /> Salvar Rubrica
-            </button>
+            {getTotalWeight() === 100 && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <Icon name="check" size={16} />
+                <span className="font-semibold">Pesos balanceados</span>
+              </div>
+            )}
           </div>
         </div>
       )}

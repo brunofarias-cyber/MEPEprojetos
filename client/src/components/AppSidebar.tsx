@@ -89,6 +89,14 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/bncc'}>
+                      <Link href="/bncc" data-testid="nav-bncc">
+                        <Icon name="book" size={20} />
+                        <span>BNCC</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </>
               )}
               {role === 'student' && (
