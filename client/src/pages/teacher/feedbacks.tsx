@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,17 +42,19 @@ export default function TeacherFeedback() {
   const form = useForm<FeedbackFormData>({
     resolver: zodResolver(feedbackFormSchema),
     defaultValues: {
-      projectId: selectedProjectId || (projects[0]?.id ?? ""),
+      projectId: "",
       comment: "",
     },
   });
 
-  // Auto-select first project if available and none selected
-  if (!selectedProjectId && projects.length > 0) {
-    const firstProjectId = projects[0].id;
-    setSelectedProjectId(firstProjectId);
-    form.setValue("projectId", firstProjectId);
-  }
+  // Auto-select first project when projects load
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      const firstProjectId = projects[0].id;
+      setSelectedProjectId(firstProjectId);
+      form.setValue("projectId", firstProjectId);
+    }
+  }, [projects, selectedProjectId, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { teacherId: string; projectId: string; comment: string }) => {
@@ -63,7 +65,8 @@ export default function TeacherFeedback() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedbacks/project", selectedProjectId] });
-      form.reset();
+      // Reset only the comment field, keep projectId selected
+      form.reset({ projectId: selectedProjectId, comment: "" });
       toast({
         title: "Feedback adicionado",
         description: "O feedback foi registrado com sucesso.",

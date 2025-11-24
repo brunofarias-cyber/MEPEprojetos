@@ -73,8 +73,17 @@ app.use((req, _res, next) => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; name: string };
       req.session.userId = decoded.userId;
+      
+      // Populate req.user for route handlers
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+        name: decoded.name || '',
+      };
+      
       console.log('[JWT Auth] User authenticated via token:', decoded.userId);
     } catch (error) {
       console.error('[JWT Auth] Invalid token:', error);

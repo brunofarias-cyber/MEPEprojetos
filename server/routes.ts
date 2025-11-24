@@ -247,6 +247,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Get current teacher data
+  app.get("/api/me/teacher", async (req, res) => {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    if (user.role !== "teacher") {
+      return res.status(403).json({ error: "Acesso permitido apenas para professores" });
+    }
+
+    const teacher = await storage.getTeacherByUserId(user.id);
+    if (!teacher) {
+      return res.status(404).json({ error: "Dados do professor não encontrados" });
+    }
+
+    res.json(teacher);
+  });
+
   // Existing routes below...
   // Teachers
   app.get("/api/teachers", async (req, res) => {
