@@ -9,7 +9,7 @@ async function throwIfResNotOk(res: Response) {
 
 export async function apiRequest(
   url: string,
-  options?: RequestInit,
+  options?: RequestInit & { body?: any },
 ): Promise<any> {
   // Get JWT token from localStorage for authentication
   const token = localStorage.getItem('bprojetos_token');
@@ -19,8 +19,16 @@ export async function apiRequest(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // Serialize body as JSON if it's an object
+  let body = options?.body;
+  if (body && typeof body === 'object' && !(body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+    body = JSON.stringify(body);
+  }
+
   const res = await fetch(url, {
     ...options,
+    body,
     headers,
     credentials: "include",
   });

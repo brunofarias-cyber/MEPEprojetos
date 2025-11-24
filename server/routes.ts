@@ -485,7 +485,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         competencies
       );
 
-      res.json({ suggestions });
+      // Enrich suggestions with full competency objects
+      const enrichedSuggestions = suggestions.map(s => {
+        const competency = competencies.find(c => c.id === s.competencyId);
+        return {
+          competency,
+          coverage: s.coverage,
+          justification: s.justification,
+        };
+      }).filter(s => s.competency !== undefined); // Remove any suggestions without valid competency
+
+      res.json({ suggestions: enrichedSuggestions });
     } catch (error: any) {
       console.error("[AI Analysis Error]:", error);
       res.status(500).json({ error: error.message || "Erro ao analisar projeto" });

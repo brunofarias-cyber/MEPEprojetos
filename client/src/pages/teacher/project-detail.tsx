@@ -91,8 +91,10 @@ export default function ProjectDetail() {
   const savePlanningMutation = useMutation({
     mutationFn: async (data: z.infer<typeof planningFormSchema>) => {
       if (!id) throw new Error('Project ID is required');
-      const method = planning ? 'PATCH' : 'POST';
-      const payload = planning ? data : { ...data, projectId: id };
+      // Check if planning exists by verifying if it has an id property
+      const planningExists = planning && 'id' in planning && planning.id;
+      const method = planningExists ? 'PATCH' : 'POST';
+      const payload = planningExists ? data : { ...data, projectId: id };
       return apiRequest(`/api/projects/${id}/planning`, {
         method,
         body: payload,
@@ -463,7 +465,7 @@ export default function ProjectDetail() {
                       type="button"
                       variant="outline"
                       onClick={handleAnalyzeClick}
-                      disabled={!planning || analyzeWithAiMutation.isPending || savePlanningMutation.isPending}
+                      disabled={!(planning && 'id' in planning && planning.id) || analyzeWithAiMutation.isPending || savePlanningMutation.isPending}
                       data-testid="button-analyze-ai"
                     >
                       {analyzeWithAiMutation.isPending ? (
