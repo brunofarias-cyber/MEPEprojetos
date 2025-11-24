@@ -306,6 +306,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(teacher);
   });
 
+  app.get("/api/teachers/me/pending-actions", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Acesso permitido apenas para professores" });
+      }
+
+      const teacher = await storage.getTeacherByUserId(req.user.id);
+      if (!teacher) {
+        return res.status(404).json({ error: "Professor não encontrado" });
+      }
+
+      const pendingActions = await storage.getPendingActions(teacher.id);
+      res.json(pendingActions);
+    } catch (error: any) {
+      console.error("[Pending Actions] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/teachers", async (req, res) => {
     try {
       const data = insertTeacherSchema.parse(req.body);

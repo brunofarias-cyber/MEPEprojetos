@@ -2,11 +2,27 @@ import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ProjectCard } from "@/components/ProjectCard";
 import { CreateProjectModal } from "@/components/CreateProjectModal";
+import { PendingActionsCard } from "@/components/PendingActionsCard";
+import { useAuth } from "@/contexts/AuthContext";
 import type { ProjectWithTeacher } from "@shared/schema";
 
+interface PendingAction {
+  projectsWithoutPlanning: number;
+  projectsWithoutCompetencies: number;
+  upcomingDeadlines: Array<{ projectId: string; title: string; deadline: string }>;
+  upcomingEvents: Array<{ id: string; title: string; date: string; projectId: string | null }>;
+}
+
 export default function TeacherDashboard() {
+  const { user } = useAuth();
+  
   const { data: projects = [], isLoading } = useQuery<ProjectWithTeacher[]>({
     queryKey: ['/api/projects'],
+  });
+
+  const { data: pendingActions, isLoading: pendingActionsLoading } = useQuery<PendingAction>({
+    queryKey: ['/api/teachers/me/pending-actions'],
+    enabled: user?.role === 'teacher',
   });
 
   if (isLoading) {
@@ -33,6 +49,11 @@ export default function TeacherDashboard() {
         <h2 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-dashboard">Visão Geral</h2>
         <p className="text-muted-foreground">Acompanhe o progresso dos seus projetos em tempo real.</p>
       </div>
+
+      {/* Pending Actions Card */}
+      {!pendingActionsLoading && pendingActions && (
+        <PendingActionsCard data={pendingActions} />
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

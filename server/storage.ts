@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -131,6 +131,14 @@ export interface IStorage {
   getEventResponsesByEvent(eventId: string): Promise<EventResponse[]>;
   createEventResponse(response: InsertEventResponse): Promise<EventResponse>;
   updateEventResponse(eventId: string, studentId: string, status: string): Promise<EventResponse | undefined>;
+
+  // Pending Actions (Teacher Dashboard)
+  getPendingActions(teacherId: string): Promise<{
+    projectsWithoutPlanning: number;
+    projectsWithoutCompetencies: number;
+    upcomingDeadlines: Array<{ projectId: string; title: string; deadline: string }>;
+    upcomingEvents: Array<{ id: string; title: string; date: string; projectId: string | null }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -625,6 +633,91 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updated || undefined;
+  }
+
+  async getPendingActions(teacherId: string) {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    const teacherProjects = await db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.teacherId, teacherId));
+
+    if (teacherProjects.length === 0) {
+      return {
+        projectsWithoutPlanning: 0,
+        projectsWithoutCompetencies: 0,
+        upcomingDeadlines: [],
+        upcomingEvents: [],
+      };
+    }
+
+    const projectIds = teacherProjects.map(p => p.id);
+
+    const allPlanning = await db
+      .select({ projectId: schema.projectPlanning.projectId })
+      .from(schema.projectPlanning)
+      .where(inArray(schema.projectPlanning.projectId, projectIds));
+
+    const planningSet = new Set(allPlanning.map(p => p.projectId));
+
+    const allCompetencies = await db
+      .select({ projectId: schema.projectCompetencies.projectId })
+      .from(schema.projectCompetencies)
+      .where(inArray(schema.projectCompetencies.projectId, projectIds));
+
+    const competenciesSet = new Set(allCompetencies.map(c => c.projectId));
+
+    let projectsWithoutPlanning = 0;
+    let projectsWithoutCompetencies = 0;
+    const upcomingDeadlines: Array<{ projectId: string; title: string; deadline: string }> = [];
+
+    for (const project of teacherProjects) {
+      if (!planningSet.has(project.id)) {
+        projectsWithoutPlanning++;
+      }
+
+      if (!competenciesSet.has(project.id)) {
+        projectsWithoutCompetencies++;
+      }
+
+      if (project.nextDeadline) {
+        const deadlineDate = new Date(project.nextDeadline);
+        if (deadlineDate >= now && deadlineDate <= sevenDaysFromNow) {
+          upcomingDeadlines.push({
+            projectId: project.id,
+            title: project.title,
+            deadline: project.nextDeadline,
+          });
+        }
+      }
+    }
+
+    const upcomingEventsData = await db
+      .select()
+      .from(schema.events)
+      .where(eq(schema.events.teacherId, teacherId));
+
+    const upcomingEvents = upcomingEventsData
+      .filter(event => {
+        const eventDate = new Date(event.date);
+        return eventDate >= now && eventDate <= threeDaysFromNow;
+      })
+      .map(event => ({
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        projectId: event.projectId,
+      }));
+
+    return {
+      projectsWithoutPlanning,
+      projectsWithoutCompetencies,
+      upcomingDeadlines,
+      upcomingEvents,
+    };
   }
 }
 
