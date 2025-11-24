@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { CreateClassModal } from "@/components/CreateClassModal";
+import { SpreadsheetImport } from "@/components/SpreadsheetImport";
 import type { Class } from "@shared/schema";
 
 export default function TeacherClasses() {
@@ -31,7 +32,10 @@ export default function TeacherClasses() {
       <div className="animate-fade-in">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
-          <CreateClassModal />
+          <div className="flex gap-2">
+            <SpreadsheetImport />
+            <CreateClassModal />
+          </div>
         </div>
         <div className="flex justify-center items-center h-64">
           <div className="text-muted-foreground">Carregando turmas...</div>
@@ -44,7 +48,10 @@ export default function TeacherClasses() {
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
-        <CreateClassModal />
+        <div className="flex gap-2">
+          <SpreadsheetImport />
+          <CreateClassModal />
+        </div>
       </div>
       
       {classes.length === 0 ? (

@@ -47,6 +47,19 @@ export const projects = pgTable("projects", {
   description: text("description"),
 });
 
+// Project Planning table
+export const projectPlanning = pgTable("project_planning", {
+  id: varchar("id").primaryKey(),
+  projectId: varchar("project_id").notNull().unique().references(() => projects.id, { onDelete: 'cascade' }),
+  objectives: text("objectives"), // Objetivos do projeto
+  methodology: text("methodology"), // Metodologia/Abordagem
+  resources: text("resources"), // Recursos necessários
+  timeline: text("timeline"), // Cronograma
+  expectedOutcomes: text("expected_outcomes"), // Resultados esperados
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Rubric Criteria table
 export const rubricCriteria = pgTable("rubric_criteria", {
   id: varchar("id").primaryKey(),
@@ -173,6 +186,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({ id: true });
 export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
+export const insertProjectPlanningSchema = createInsertSchema(projectPlanning).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRubricCriteriaSchema = createInsertSchema(rubricCriteria).omit({ id: true });
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true });
 export const insertAchievementSchema = createInsertSchema(achievements).omit({ id: true });
@@ -198,6 +212,9 @@ export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
+
+export type ProjectPlanning = typeof projectPlanning.$inferSelect;
+export type InsertProjectPlanning = z.infer<typeof insertProjectPlanningSchema>;
 
 export type RubricCriteria = typeof rubricCriteria.$inferSelect;
 export type InsertRubricCriteria = z.infer<typeof insertRubricCriteriaSchema>;

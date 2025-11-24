@@ -7,6 +7,7 @@ import type {
   Coordinator, InsertCoordinator,
   Teacher, InsertTeacher,
   Project, InsertProject,
+  ProjectPlanning, InsertProjectPlanning,
   RubricCriteria, InsertRubricCriteria,
   Student, InsertStudent,
   Achievement, InsertAchievement,
@@ -49,6 +50,11 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<boolean>;
+
+  // Project Planning
+  getProjectPlanning(projectId: string): Promise<ProjectPlanning | undefined>;
+  createProjectPlanning(planning: InsertProjectPlanning): Promise<ProjectPlanning>;
+  updateProjectPlanning(projectId: string, planning: Partial<InsertProjectPlanning>): Promise<ProjectPlanning | undefined>;
 
   // Rubric Criteria
   getRubricCriteria(projectId: string): Promise<RubricCriteria[]>;
@@ -244,6 +250,27 @@ export class DatabaseStorage implements IStorage {
   async deleteProject(id: string): Promise<boolean> {
     const result = await db.delete(schema.projects).where(eq(schema.projects.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Project Planning
+  async getProjectPlanning(projectId: string): Promise<ProjectPlanning | undefined> {
+    const [planning] = await db.select().from(schema.projectPlanning).where(eq(schema.projectPlanning.projectId, projectId));
+    return planning || undefined;
+  }
+
+  async createProjectPlanning(insertPlanning: InsertProjectPlanning): Promise<ProjectPlanning> {
+    const id = randomUUID();
+    const [planning] = await db.insert(schema.projectPlanning).values({ ...insertPlanning, id }).returning();
+    return planning;
+  }
+
+  async updateProjectPlanning(projectId: string, planningUpdate: Partial<InsertProjectPlanning>): Promise<ProjectPlanning | undefined> {
+    const now = new Date();
+    const [updated] = await db.update(schema.projectPlanning)
+      .set({ ...planningUpdate, updatedAt: now })
+      .where(eq(schema.projectPlanning.projectId, projectId))
+      .returning();
+    return updated || undefined;
   }
 
   // Rubric Criteria

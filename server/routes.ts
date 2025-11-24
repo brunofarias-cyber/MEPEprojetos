@@ -4,13 +4,15 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import { PDFParse } from "pdf-parse";
+import * as XLSX from "xlsx";
 import { storage } from "./storage";
 import { extractCompetenciesFromText, analyzeProjectAlignment } from "./services/bnccAiService";
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
 import { 
   insertUserSchema,
-  insertProjectSchema, 
+  insertProjectSchema,
+  insertProjectPlanningSchema,
   insertTeacherSchema, 
   insertRubricCriteriaSchema,
   insertStudentSchema,
@@ -36,6 +38,26 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
+
+// Configure multer for spreadsheet uploads (Excel/CSV)
+const uploadSpreadsheet = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = [
+      'application/vnd.ms-excel', // .xls
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'text/csv', // .csv
+    ];
+    if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos Excel (.xls, .xlsx) ou CSV são permitidos'));
     }
   },
 });
@@ -349,6 +371,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Project Planning
+  app.get("/api/projects/:id/planning", async (req, res) => {
+    try {
+      const planning = await storage.getProjectPlanning(req.params.id);
+      if (!planning) {
+        // Return empty planning object if not found
+        return res.json({
+          projectId: req.params.id,
+          objectives: null,
+          methodology: null,
+          resources: null,
+          timeline: null,
+          expectedOutcomes: null,
+        });
+      }
+      res.json(planning);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/projects/:id/planning", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem criar planejamento" });
+      }
+
+      const data = insertProjectPlanningSchema.parse({
+        ...req.body,
+        projectId: req.params.id,
+      });
+
+      // Check if planning already exists
+      const existing = await storage.getProjectPlanning(req.params.id);
+      if (existing) {
+        return res.status(400).json({ error: "Planejamento já existe para este projeto" });
+      }
+
+      const planning = await storage.createProjectPlanning(data);
+      res.status(201).json(planning);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/projects/:id/planning", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem atualizar planejamento" });
+      }
+
+      const data = insertProjectPlanningSchema.partial().parse(req.body);
+      const planning = await storage.updateProjectPlanning(req.params.id, data);
+      
+      if (!planning) {
+        return res.status(404).json({ error: "Planejamento não encontrado" });
+      }
+
+      res.json(planning);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Rubric Criteria
   app.get("/api/rubrics/:projectId", async (req, res) => {
     const criteria = await storage.getRubricCriteria(req.params.projectId);
@@ -567,6 +661,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/teachers/:id/classes", async (req, res) => {
     const classes = await storage.getClassesByTeacher(req.params.id);
     res.json(classes);
+  });
+
+  // Spreadsheet import endpoint for students
+  app.post("/api/students/import-spreadsheet", uploadSpreadsheet.single('file'), async (req, res) => {
+    try {
+      // Validate authentication - check both req.user (JWT) and session
+      let userId = req.user?.id || req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Get user to check role
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ error: "Usuário não encontrado" });
+      }
+
+      // Only teachers and coordinators can import students
+      if (user.role !== 'teacher' && user.role !== 'coordinator') {
+        return res.status(403).json({ error: "Apenas professores e coordenadores podem importar alunos" });
+      }
+
+      // Validate file upload
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo foi enviado" });
+      }
+
+      console.log("[Spreadsheet Import] Processing file:", req.file.originalname);
+
+      // Parse spreadsheet
+      let workbook: XLSX.WorkBook;
+      try {
+        workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      } catch (error: any) {
+        return res.status(400).json({ error: "Erro ao ler planilha: " + error.message });
+      }
+
+      // Get first sheet
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Convert to JSON
+      const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      
+      if (rawData.length === 0) {
+        return res.status(400).json({ error: "A planilha está vazia" });
+      }
+
+      console.log("[Spreadsheet Import] Found", rawData.length, "rows");
+      console.log("[Spreadsheet Import] First row keys:", Object.keys(rawData[0]));
+
+      // Auto-detect columns (case-insensitive, flexible matching with normalization)
+      const firstRow = rawData[0];
+      const originalKeys = Object.keys(firstRow);
+      
+      // Normalize column names: lowercase, remove accents, trim
+      const normalizeString = (str: string) => {
+        return str.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+          .trim();
+      };
+      
+      const normalizedKeys = originalKeys.map(normalizeString);
+      
+      // Find column mappings with normalized comparisons
+      const nameIndex = normalizedKeys.findIndex(k => 
+        k.includes('nome') || k.includes('name') || k.includes('aluno') || k.includes('student')
+      );
+      const emailIndex = normalizedKeys.findIndex(k => 
+        k.includes('email') || k.includes('e-mail') || k === 'email'
+      );
+      const classIndex = normalizedKeys.findIndex(k => 
+        k.includes('turma') || k.includes('class') || k.includes('sala')
+      );
+
+      if (nameIndex === -1 || emailIndex === -1) {
+        return res.status(400).json({ 
+          error: "Planilha deve conter colunas 'Nome' e 'Email' (colunas detectadas: " + originalKeys.join(', ') + ")" 
+        });
+      }
+
+      // Get original column names using indices
+      const nameKey = originalKeys[nameIndex];
+      const emailKey = originalKeys[emailIndex];
+      const classKey = classIndex !== -1 ? originalKeys[classIndex] : null;
+
+      console.log("[Spreadsheet Import] Column mapping:", { nameKey, emailKey, classKey });
+
+      // Process students
+      const results = {
+        total: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [] as string[],
+      };
+
+      for (let i = 0; i < rawData.length; i++) {
+        const row = rawData[i];
+        const name = row[nameKey]?.toString().trim();
+        const email = row[emailKey]?.toString().trim().toLowerCase();
+        const className = classKey ? row[classKey]?.toString().trim() : null;
+
+        results.total++;
+
+        // Validate required fields
+        if (!name || !email) {
+          results.skipped++;
+          results.errors.push(`Linha ${i + 2}: Nome ou email vazio`);
+          continue;
+        }
+
+        // Validate email format
+        if (!email.includes('@')) {
+          results.skipped++;
+          results.errors.push(`Linha ${i + 2}: Email inválido (${email})`);
+          continue;
+        }
+
+        try {
+          // Check if user already exists
+          const existingUser = await storage.getUserByEmail(email);
+          
+          if (existingUser) {
+            // User exists - update student if needed
+            if (existingUser.role === 'student') {
+              results.updated++;
+              console.log(`[Import] Existing student: ${email}`);
+            } else {
+              results.skipped++;
+              results.errors.push(`Linha ${i + 2}: Email ${email} já está em uso por um ${existingUser.role}`);
+            }
+          } else {
+            // Create new user and student
+            const hashedPassword = await bcrypt.hash('123456', 10); // Default password
+            
+            const user = await storage.createUser({
+              email,
+              hashedPassword,
+              name,
+              role: 'student',
+              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+            });
+
+            await storage.createStudent({
+              userId: user.id,
+              name,
+              email,
+              avatar: user.avatar,
+              xp: 0,
+              level: 1,
+            });
+
+            results.created++;
+            console.log(`[Import] Created student: ${email}`);
+          }
+        } catch (error: any) {
+          results.skipped++;
+          results.errors.push(`Linha ${i + 2}: ${error.message}`);
+        }
+      }
+
+      console.log("[Spreadsheet Import] Complete:", results);
+
+      res.json({
+        success: true,
+        message: `Importação concluída: ${results.created} criados, ${results.updated} atualizados, ${results.skipped} ignorados`,
+        results,
+      });
+    } catch (error: any) {
+      console.error("[Spreadsheet Import] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // BNCC Competencies Routes (All authenticated users can view)
