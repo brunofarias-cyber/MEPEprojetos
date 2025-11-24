@@ -88,7 +88,10 @@ export interface IStorage {
 
   // Project Competencies
   getProjectCompetencies(projectId: string): Promise<ProjectCompetency[]>;
+  getProjectCompetenciesWithDetails(projectId: string): Promise<any[]>;
   createProjectCompetency(projectCompetency: InsertProjectCompetency): Promise<ProjectCompetency>;
+  deleteProjectCompetencies(projectId: string): Promise<void>;
+  replaceProjectCompetencies(projectId: string, competencies: InsertProjectCompetency[]): Promise<ProjectCompetency[]>;
 
   // Submissions
   getSubmissions(projectId: string): Promise<Submission[]>;
@@ -420,10 +423,48 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schema.projectCompetencies).where(eq(schema.projectCompetencies.projectId, projectId));
   }
 
+  async getProjectCompetenciesWithDetails(projectId: string): Promise<any[]> {
+    return await db
+      .select({
+        id: schema.projectCompetencies.id,
+        projectId: schema.projectCompetencies.projectId,
+        competencyId: schema.projectCompetencies.competencyId,
+        coverage: schema.projectCompetencies.coverage,
+        competency: schema.bnccCompetencies,
+      })
+      .from(schema.projectCompetencies)
+      .leftJoin(schema.bnccCompetencies, eq(schema.projectCompetencies.competencyId, schema.bnccCompetencies.id))
+      .where(eq(schema.projectCompetencies.projectId, projectId));
+  }
+
   async createProjectCompetency(insertProjectCompetency: InsertProjectCompetency): Promise<ProjectCompetency> {
     const id = randomUUID();
     const [projectCompetency] = await db.insert(schema.projectCompetencies).values({ ...insertProjectCompetency, id }).returning();
     return projectCompetency;
+  }
+
+  async deleteProjectCompetencies(projectId: string): Promise<void> {
+    await db.delete(schema.projectCompetencies).where(eq(schema.projectCompetencies.projectId, projectId));
+  }
+
+  async replaceProjectCompetencies(projectId: string, competencies: InsertProjectCompetency[]): Promise<ProjectCompetency[]> {
+    // Use Drizzle transaction to ensure atomicity
+    return await db.transaction(async (tx) => {
+      // Delete old competencies
+      await tx.delete(schema.projectCompetencies).where(eq(schema.projectCompetencies.projectId, projectId));
+      
+      // Insert new competencies
+      const newCompetencies: ProjectCompetency[] = [];
+      for (const comp of competencies) {
+        const id = randomUUID();
+        const [projectCompetency] = await tx.insert(schema.projectCompetencies)
+          .values({ ...comp, id })
+          .returning();
+        newCompetencies.push(projectCompetency);
+      }
+      
+      return newCompetencies;
+    });
   }
 
   // Submissions

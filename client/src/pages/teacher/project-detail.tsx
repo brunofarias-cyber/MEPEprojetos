@@ -3,34 +3,41 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Icon } from "@/components/Icon";
-import type { ProjectWithTeacher, RubricCriteria, ProjectPlanning } from "@shared/schema";
-import { insertProjectPlanningSchema } from "@shared/schema";
-import { ArrowLeft } from "lucide-react";
+import type { ProjectWithTeacher, RubricCriteria, ProjectPlanning, BnccCompetency, ProjectCompetency } from "@shared/schema";
+import { ArrowLeft, Sparkles, Check, X, Loader2 } from "lucide-react";
 
-const planningFormSchema = insertProjectPlanningSchema
-  .omit({ id: true, projectId: true, createdAt: true, updatedAt: true })
-  .extend({
-    objectives: z.string().optional(),
-    methodology: z.string().optional(),
-    resources: z.string().optional(),
-    timeline: z.string().optional(),
-    expectedOutcomes: z.string().optional(),
-  });
+const planningFormSchema = z.object({
+  objectives: z.string().optional(),
+  methodology: z.string().optional(),
+  resources: z.string().optional(),
+  timeline: z.string().optional(),
+  expectedOutcomes: z.string().optional(),
+});
+
+type AiSuggestion = {
+  competency: BnccCompetency;
+  coverage: number;
+  justification: string;
+  selected: boolean;
+};
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
 
   const { data: project, isLoading: projectLoading } = useQuery<ProjectWithTeacher>({
     queryKey: ['/api/projects', id],
@@ -49,6 +56,11 @@ export default function ProjectDetail() {
 
   const { data: planning } = useQuery<ProjectPlanning>({
     queryKey: [`/api/projects/${id}/planning`],
+    enabled: !!id,
+  });
+
+  const { data: projectCompetencies = [] } = useQuery<(ProjectCompetency & { competency: BnccCompetency })[]>({
+    queryKey: [`/api/projects/${id}/competencies`],
     enabled: !!id,
   });
 
@@ -106,6 +118,96 @@ export default function ProjectDetail() {
 
   const onSubmitPlanning = (data: z.infer<typeof planningFormSchema>) => {
     savePlanningMutation.mutate(data);
+  };
+
+  const analyzeWithAiMutation = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('Project ID is required');
+      return apiRequest(`/api/projects/${id}/planning/analyze`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (data: any) => {
+      const suggestions: AiSuggestion[] = data.suggestions.map((s: any) => ({
+        competency: s.competency,
+        coverage: s.coverage,
+        justification: s.justification,
+        selected: true,
+      }));
+      setAiSuggestions(suggestions);
+      setShowAiModal(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro na análise",
+        description: error.message || "Não foi possível analisar o planejamento.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveCompetenciesMutation = useMutation({
+    mutationFn: async (competencies: { competencyId: string; coverage: number }[]) => {
+      if (!id) throw new Error('Project ID is required');
+      return apiRequest(`/api/projects/${id}/competencies`, {
+        method: 'POST',
+        body: { competencies },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${id}/competencies`] });
+      setShowAiModal(false);
+      setAiSuggestions([]);
+      toast({
+        title: "Competências vinculadas!",
+        description: "As competências BNCC foram vinculadas ao projeto com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar as competências.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAnalyzeClick = () => {
+    if (!planning) {
+      toast({
+        title: "Planejamento não encontrado",
+        description: "Salve o planejamento antes de analisar com IA.",
+        variant: "destructive",
+      });
+      return;
+    }
+    analyzeWithAiMutation.mutate();
+  };
+
+  const toggleSuggestion = (index: number) => {
+    setAiSuggestions(prev => 
+      prev.map((s, i) => i === index ? { ...s, selected: !s.selected } : s)
+    );
+  };
+
+  const handleSaveCompetencies = () => {
+    const selected = aiSuggestions
+      .filter(s => s.selected)
+      .map(s => ({
+        competencyId: s.competency.id,
+        coverage: s.coverage,
+      }));
+    
+    if (selected.length === 0) {
+      toast({
+        title: "Nenhuma competência selecionada",
+        description: "Selecione pelo menos uma competência para vincular ao projeto.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    saveCompetenciesMutation.mutate(selected);
   };
 
   if (projectLoading || !project) {
@@ -356,7 +458,26 @@ export default function ProjectDetail() {
                     )}
                   />
 
-                  <div className="flex justify-end gap-3">
+                  <div className="flex justify-between items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAnalyzeClick}
+                      disabled={!planning || analyzeWithAiMutation.isPending || savePlanningMutation.isPending}
+                      data-testid="button-analyze-ai"
+                    >
+                      {analyzeWithAiMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Analisando...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Analisar com IA
+                        </>
+                      )}
+                    </Button>
                     <Button
                       type="submit"
                       disabled={savePlanningMutation.isPending || !form.formState.isDirty}
@@ -369,6 +490,48 @@ export default function ProjectDetail() {
               </Form>
             </CardContent>
           </Card>
+
+          {projectCompetencies.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Competências BNCC Vinculadas</CardTitle>
+                <CardDescription>
+                  Competências da Base Nacional Comum Curricular vinculadas a este projeto
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {projectCompetencies.map((pc) => (
+                    <div 
+                      key={pc.id}
+                      className="p-4 border border-border rounded-lg bg-muted/30"
+                      data-testid={`competency-${pc.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-foreground">{pc.competency.name}</h4>
+                            <Badge variant="outline" data-testid={`badge-category-${pc.id}`}>
+                              {pc.competency.category}
+                            </Badge>
+                          </div>
+                          {pc.competency.description && (
+                            <p className="text-sm text-muted-foreground">{pc.competency.description}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground mb-1">Cobertura</div>
+                          <div className="text-lg font-bold text-primary" data-testid={`text-coverage-${pc.id}`}>
+                            {pc.coverage}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Rubrics Tab */}
@@ -404,6 +567,119 @@ export default function ProjectDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* AI Analysis Modal */}
+      <Dialog open={showAiModal} onOpenChange={setShowAiModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="modal-ai-analysis">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Sugestões de Competências BNCC
+            </DialogTitle>
+            <DialogDescription>
+              A IA analisou o planejamento do projeto e sugeriu as seguintes competências. 
+              Selecione as que deseja vincular ao projeto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {aiSuggestions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Nenhuma sugestão disponível.</p>
+              </div>
+            ) : (
+              aiSuggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className={`p-4 border rounded-lg transition-all ${
+                    suggestion.selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-muted/20'
+                  }`}
+                  data-testid={`suggestion-${index}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleSuggestion(index)}
+                      className={`mt-1 flex-shrink-0 ${
+                        suggestion.selected
+                          ? 'text-primary hover:text-primary'
+                          : 'text-muted-foreground'
+                      }`}
+                      data-testid={`button-toggle-${index}`}
+                    >
+                      {suggestion.selected ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <X className="w-5 h-5" />
+                      )}
+                    </Button>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold text-foreground">
+                          {suggestion.competency.name}
+                        </h4>
+                        <Badge variant="outline" data-testid={`badge-category-${index}`}>
+                          {suggestion.competency.category}
+                        </Badge>
+                        <Badge className="ml-auto" data-testid={`badge-coverage-${index}`}>
+                          {suggestion.coverage}% cobertura
+                        </Badge>
+                      </div>
+                      
+                      {suggestion.competency.description && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {suggestion.competency.description}
+                        </p>
+                      )}
+                      
+                      <div className="mt-3 p-3 bg-background rounded-md border border-border">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Justificativa da IA:
+                        </p>
+                        <p className="text-sm text-foreground">
+                          {suggestion.justification}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowAiModal(false)}
+              disabled={saveCompetenciesMutation.isPending}
+              data-testid="button-cancel-ai"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveCompetencies}
+              disabled={saveCompetenciesMutation.isPending || aiSuggestions.filter(s => s.selected).length === 0}
+              data-testid="button-save-competencies"
+            >
+              {saveCompetenciesMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                `Vincular ${aiSuggestions.filter(s => s.selected).length} Competência${aiSuggestions.filter(s => s.selected).length !== 1 ? 's' : ''}`
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

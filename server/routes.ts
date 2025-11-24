@@ -466,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get available BNCC competencies
-      const competencies = await storage.getBnccCompetencies();
+      const competencies = await storage.getCompetencies();
       if (competencies.length === 0) {
         return res.status(400).json({ error: "Nenhuma competência BNCC cadastrada. Faça o upload de um documento BNCC primeiro." });
       }
@@ -655,8 +655,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Project Competencies
   app.get("/api/projects/:projectId/competencies", async (req, res) => {
-    const competencies = await storage.getProjectCompetencies(req.params.projectId);
+    const competencies = await storage.getProjectCompetenciesWithDetails(req.params.projectId);
     res.json(competencies);
+  });
+
+  app.post("/api/projects/:projectId/competencies", async (req, res) => {
+    try {
+      // Validate authentication
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Validate teacher role
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem vincular competências" });
+      }
+
+      const { projectId } = req.params;
+      const { competencies } = req.body;
+
+      if (!Array.isArray(competencies)) {
+        return res.status(400).json({ error: "competencies deve ser um array" });
+      }
+
+      // Validate project exists and belongs to teacher
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: "Projeto não encontrado" });
+      }
+
+      const teacher = await storage.getTeacherByUserId(req.user.id);
+      if (!teacher) {
+        return res.status(404).json({ error: "Professor não encontrado" });
+      }
+
+      if (project.teacherId !== teacher.id) {
+        return res.status(403).json({ error: "Você não tem permissão para modificar este projeto" });
+      }
+
+      // Replace existing competencies with new ones (transactional)
+      const competenciesToInsert = competencies.map((comp: any) => ({
+        projectId,
+        competencyId: comp.competencyId,
+        coverage: comp.coverage,
+      }));
+
+      const results = await storage.replaceProjectCompetencies(projectId, competenciesToInsert);
+
+      res.status(201).json(results);
+    } catch (error: any) {
+      console.error("[Project Competencies] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.post("/api/project-competencies", async (req, res) => {
