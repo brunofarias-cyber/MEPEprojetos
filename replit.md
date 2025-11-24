@@ -46,9 +46,21 @@ Preferred communication style: Simple, everyday language.
 ### Feature Specifications
 - **Authentication System**: JWT Token Authentication (signed tokens, 7-day expiration), Bcrypt password hashing, role-based routing, frontend AuthContext with localStorage persistence.
 - **Roster Management**: CRUD operations for teachers and students, search/filter, modal forms with validation.
+- **Spreadsheet Import System**:
+    - **Backend**: Secure endpoint with dual authentication (JWT/session), Multer file upload, XLSX/CSV parsing with automatic column detection.
+    - **Column Normalization**: Case-insensitive, diacritic-insensitive header matching for robust imports.
+    - **Frontend**: SpreadsheetImport component with drag-and-drop, file preview, detailed import results.
+    - **Security**: Teacher/coordinator-only access, validates file types, creates students with default password.
+- **Project Planning System**:
+    - **Schema**: `project_planning` table with objectives, methodology, resources, timeline, expectedOutcomes.
+    - **UI**: Tabbed project detail page (Visão Geral, Planejamento, Avaliação) at `/project/:id`.
+    - **Forms**: react-hook-form with zodResolver, auto-save detection, proper validation.
+    - **Navigation**: Seamless routing from ProjectCard to detail view and back to dashboard.
 - **BNCC PDF Upload & AI Analysis**:
     - **Backend**: `bncc_documents` table, PDF parsing (`pdf-parse`), Multer for file upload (20MB limit, PDF-only), Coordinator-only access.
-    - **AI Integration**: OpenAI via Replit AI Integrations for extracting structured competencies and analyzing project alignment. Asynchronous processing with status tracking.
+    - **AI Integration**: OpenAI via Replit AI Integrations for extracting structured competencies and analyzing project alignment.
+    - **Project Planning Analysis**: `analyzeProjectPlanning` function analyzes complete project planning against BNCC competencies with coverage percentages and justifications.
+    - **Endpoint**: POST `/api/projects/:id/planning/analyze` validates teacher auth, planning existence, and competencies before analysis.
 - **Teacher Feedback & Calendar System**:
     - **Feedback**: Teachers can post team-level feedback for projects (create, edit, delete).
     - **Calendar**: Teachers can schedule in-person meetings with teams (create, edit, delete events).

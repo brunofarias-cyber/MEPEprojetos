@@ -6,7 +6,7 @@ import multer from "multer";
 import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
 import { storage } from "./storage";
-import { extractCompetenciesFromText, analyzeProjectAlignment } from "./services/bnccAiService";
+import { extractCompetenciesFromText, analyzeProjectAlignment, analyzeProjectPlanning } from "./services/bnccAiService";
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
 import { 
@@ -440,6 +440,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(planning);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // AI Analysis for Project Planning
+  app.post("/api/projects/:id/planning/analyze", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem analisar projetos" });
+      }
+
+      // Get project and planning
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: "Projeto não encontrado" });
+      }
+
+      const planning = await storage.getProjectPlanning(req.params.id);
+      if (!planning) {
+        return res.status(404).json({ error: "Planejamento não encontrado. Salve o planejamento antes de analisar." });
+      }
+
+      // Get available BNCC competencies
+      const competencies = await storage.getBnccCompetencies();
+      if (competencies.length === 0) {
+        return res.status(400).json({ error: "Nenhuma competência BNCC cadastrada. Faça o upload de um documento BNCC primeiro." });
+      }
+
+      // Run AI analysis
+      const suggestions = await analyzeProjectPlanning(
+        project.title,
+        project.subject,
+        {
+          objectives: planning.objectives || undefined,
+          methodology: planning.methodology || undefined,
+          resources: planning.resources || undefined,
+          timeline: planning.timeline || undefined,
+          expectedOutcomes: planning.expectedOutcomes || undefined,
+        },
+        competencies
+      );
+
+      res.json({ suggestions });
+    } catch (error: any) {
+      console.error("[AI Analysis Error]:", error);
+      res.status(500).json({ error: error.message || "Erro ao analisar projeto" });
     }
   });
 
