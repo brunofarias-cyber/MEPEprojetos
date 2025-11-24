@@ -18,6 +18,7 @@ import type {
   BnccDocument, InsertBnccDocument,
   Feedback, InsertFeedback,
   Event, InsertEvent,
+  EventResponse, InsertEventResponse,
   ProjectWithTeacher,
   StudentAchievementWithDetails,
 } from "@shared/schema";
@@ -114,6 +115,13 @@ export interface IStorage {
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event | undefined>;
   deleteEvent(id: string): Promise<boolean>;
+
+  // Event Responses
+  getEventResponse(eventId: string, studentId: string): Promise<EventResponse | undefined>;
+  getEventResponsesByStudent(studentId: string): Promise<EventResponse[]>;
+  getEventResponsesByEvent(eventId: string): Promise<EventResponse[]>;
+  createEventResponse(response: InsertEventResponse): Promise<EventResponse>;
+  updateEventResponse(eventId: string, studentId: string, status: string): Promise<EventResponse | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -510,6 +518,45 @@ export class DatabaseStorage implements IStorage {
   async deleteEvent(id: string): Promise<boolean> {
     const result = await db.delete(schema.events).where(eq(schema.events.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Event Responses
+  async getEventResponse(eventId: string, studentId: string): Promise<EventResponse | undefined> {
+    const [response] = await db.select().from(schema.eventResponses)
+      .where(and(
+        eq(schema.eventResponses.eventId, eventId),
+        eq(schema.eventResponses.studentId, studentId)
+      ));
+    return response || undefined;
+  }
+
+  async getEventResponsesByStudent(studentId: string): Promise<EventResponse[]> {
+    return await db.select().from(schema.eventResponses)
+      .where(eq(schema.eventResponses.studentId, studentId));
+  }
+
+  async getEventResponsesByEvent(eventId: string): Promise<EventResponse[]> {
+    return await db.select().from(schema.eventResponses)
+      .where(eq(schema.eventResponses.eventId, eventId));
+  }
+
+  async createEventResponse(insertResponse: InsertEventResponse): Promise<EventResponse> {
+    const id = randomUUID();
+    const [response] = await db.insert(schema.eventResponses)
+      .values({ ...insertResponse, id })
+      .returning();
+    return response;
+  }
+
+  async updateEventResponse(eventId: string, studentId: string, status: string): Promise<EventResponse | undefined> {
+    const [updated] = await db.update(schema.eventResponses)
+      .set({ status, respondedAt: new Date() })
+      .where(and(
+        eq(schema.eventResponses.eventId, eventId),
+        eq(schema.eventResponses.studentId, studentId)
+      ))
+      .returning();
+    return updated || undefined;
   }
 }
 

@@ -170,6 +170,14 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/calendar'}>
+                      <Link href="/calendar" data-testid="nav-calendario">
+                        <Icon name="calendar" size={20} />
+                        <span>Calendário</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === '/bncc'}>
                       <Link href="/bncc" data-testid="nav-bncc">
                         <Icon name="bookOpen" size={20} />

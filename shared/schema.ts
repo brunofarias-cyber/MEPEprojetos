@@ -159,6 +159,15 @@ export const events = pgTable("events", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Event Responses (student responses to events)
+export const eventResponses = pgTable("event_responses", {
+  id: varchar("id").primaryKey(),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  status: text("status").notNull(), // 'pending', 'accepted', 'rejected'
+  respondedAt: timestamp("responded_at"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({ id: true });
@@ -175,6 +184,7 @@ export const insertClassSchema = createInsertSchema(classes).omit({ id: true });
 export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({ id: true, uploadedAt: true });
 export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
+export const insertEventResponseSchema = createInsertSchema(eventResponses).omit({ id: true, respondedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -221,6 +231,9 @@ export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
+
+export type EventResponse = typeof eventResponses.$inferSelect;
+export type InsertEventResponse = z.infer<typeof insertEventResponseSchema>;
 
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };

@@ -32,6 +32,7 @@ import CoordinatorTeachers from "@/pages/coordinator/teachers";
 import CoordinatorStudents from "@/pages/coordinator/students";
 import CoordinatorMetrics from "@/pages/coordinator/metrics";
 import CoordinatorBncc from "@/pages/coordinator/bncc";
+import CoordinatorCalendar from "@/pages/coordinator/calendar";
 
 function ProtectedRoutes() {
   const { user, isLoading, logout } = useAuth();
@@ -99,6 +100,7 @@ function ProtectedRoutes() {
                     <Route path="/teachers" component={CoordinatorTeachers} />
                     <Route path="/students" component={CoordinatorStudents} />
                     <Route path="/metrics" component={CoordinatorMetrics} />
+                    <Route path="/calendar" component={CoordinatorCalendar} />
                     <Route path="/bncc" component={CoordinatorBncc} />
                   </>
                 )}

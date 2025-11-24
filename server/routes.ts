@@ -819,6 +819,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Events for students (with responses)
+  app.get("/api/events/student/:studentId", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const studentId = req.params.studentId;
+      
+      // Get all projects the student has submitted to
+      const allProjects = await storage.getProjects();
+      
+      // For now, get all events and let frontend filter by project
+      // This is simpler than querying submissions
+      const allEvents = await storage.getEvents();
+      
+      const eventsWithResponses = [];
+      
+      for (const event of allEvents) {
+        const response = await storage.getEventResponse(event.id, studentId);
+        eventsWithResponses.push({
+          ...event,
+          responseStatus: response?.status || 'pending',
+          respondedAt: response?.respondedAt || null,
+        });
+      }
+      
+      res.json(eventsWithResponses);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Event response (accept/reject by student)
+  app.post("/api/events/:eventId/response", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'student') {
+        return res.status(403).json({ error: "Apenas alunos podem responder a eventos" });
+      }
+
+      const { eventId } = req.params;
+      const { studentId, status } = req.body;
+
+      if (!['accepted', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: "Status deve ser 'accepted' ou 'rejected'" });
+      }
+
+      // Check if response already exists
+      const existing = await storage.getEventResponse(eventId, studentId);
+      
+      if (existing) {
+        // Update existing response
+        const updated = await storage.updateEventResponse(eventId, studentId, status);
+        return res.json(updated);
+      } else {
+        // Create new response
+        const response = await storage.createEventResponse({
+          eventId,
+          studentId,
+          status,
+        });
+        return res.status(201).json(response);
+      }
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Events for coordinators (all events with statistics)
+  app.get("/api/events/coordinator/all", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'coordinator') {
+        return res.status(403).json({ error: "Apenas coordenadores podem acessar esta rota" });
+      }
+
+      const events = await storage.getEvents();
+      
+      // Add response statistics to each event
+      const eventsWithStats = await Promise.all(events.map(async (event) => {
+        const responses = await storage.getEventResponsesByEvent(event.id);
+        const accepted = responses.filter(r => r.status === 'accepted').length;
+        const rejected = responses.filter(r => r.status === 'rejected').length;
+        const pending = responses.filter(r => r.status === 'pending').length;
+        
+        // Get teacher name
+        const teacher = await storage.getTeacher(event.teacherId);
+        
+        return {
+          ...event,
+          teacherName: teacher?.name || 'Desconhecido',
+          statistics: {
+            accepted,
+            rejected,
+            pending,
+            total: responses.length,
+          },
+        };
+      }));
+      
+      res.json(eventsWithStats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // AI-powered project alignment analysis
   app.post("/api/projects/:id/analyze-alignment", async (req, res) => {
     try {
