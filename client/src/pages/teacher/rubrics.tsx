@@ -65,8 +65,39 @@ export default function TeacherRubrics() {
 
   const handleWeightBlur = (criteriaId: string) => {
     const editedCriteria = editingCriteria[criteriaId];
-    if (editedCriteria?.weight !== undefined) {
-      updateWeightMutation.mutate({ criteriaId, weight: editedCriteria.weight });
+    if (editedCriteria?.weight === undefined) return;
+
+    // Calculate total with new weight
+    const newTotal = projectRubrics.reduce((sum, c) => {
+      if (c.id === criteriaId) return sum + editedCriteria.weight;
+      const editedWeight = editingCriteria[c.id]?.weight;
+      return sum + (editedWeight !== undefined ? editedWeight : c.weight);
+    }, 0);
+
+    // Validate total doesn't exceed 100%
+    if (newTotal > 100) {
+      toast({
+        title: "Peso inválido",
+        description: `O total dos pesos seria ${newTotal}%. Não pode ultrapassar 100%.`,
+        variant: "destructive",
+      });
+      // Reset to original value
+      setEditingCriteria(prev => {
+        const newState = { ...prev };
+        delete newState[criteriaId];
+        return newState;
+      });
+      return;
+    }
+
+    updateWeightMutation.mutate({ criteriaId, weight: editedCriteria.weight });
+  };
+
+  const handleWeightKeyDown = (e: React.KeyboardEvent, criteriaId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.target as HTMLInputElement).blur();
+      handleWeightBlur(criteriaId);
     }
   };
 
@@ -153,6 +184,7 @@ export default function TeacherRubrics() {
                             value={editingCriteria[criteria.id]?.weight ?? criteria.weight}
                             onChange={(e) => handleWeightChange(criteria.id, parseInt(e.target.value))}
                             onMouseUp={() => handleWeightBlur(criteria.id)}
+                            onTouchEnd={() => handleWeightBlur(criteria.id)}
                             className="flex-1 cursor-pointer"
                             data-testid={`slider-weight-${criteria.id}`}
                           />
@@ -163,6 +195,7 @@ export default function TeacherRubrics() {
                             value={editingCriteria[criteria.id]?.weight ?? criteria.weight}
                             onChange={(e) => handleWeightChange(criteria.id, parseInt(e.target.value) || 0)}
                             onBlur={() => handleWeightBlur(criteria.id)}
+                            onKeyDown={(e) => handleWeightKeyDown(e, criteria.id)}
                             className="font-bold text-primary w-16 text-right bg-transparent border border-border rounded px-2 py-1"
                             data-testid={`input-weight-${criteria.id}`}
                           />
