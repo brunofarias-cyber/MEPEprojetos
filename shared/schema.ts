@@ -89,6 +89,17 @@ export const studentAchievements = pgTable("student_achievements", {
   unlocked: boolean("unlocked").notNull().default(false),
 });
 
+// BNCC Documents (uploaded PDF files) - MUST be defined before bnccCompetencies
+export const bnccDocuments = pgTable("bncc_documents", {
+  id: varchar("id").primaryKey(),
+  filename: text("filename").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull().references(() => coordinators.id, { onDelete: 'cascade' }),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  textContent: text("text_content"), // Extracted text from PDF
+  processingStatus: text("processing_status").notNull().default("processing"), // processing, completed, failed
+  competenciesExtracted: integer("competencies_extracted").default(0),
+});
+
 // BNCC Competencies
 export const bnccCompetencies = pgTable("bncc_competencies", {
   id: varchar("id").primaryKey(),
@@ -124,17 +135,6 @@ export const classes = pgTable("classes", {
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   studentCount: integer("student_count").notNull().default(0),
   engagement: integer("engagement").notNull().default(0), // 0-100%
-});
-
-// BNCC Documents (uploaded PDF files)
-export const bnccDocuments = pgTable("bncc_documents", {
-  id: varchar("id").primaryKey(),
-  filename: text("filename").notNull(),
-  uploadedBy: varchar("uploaded_by").notNull().references(() => coordinators.id, { onDelete: 'cascade' }),
-  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
-  textContent: text("text_content"), // Extracted text from PDF
-  processingStatus: text("processing_status").notNull().default("processing"), // processing, completed, failed
-  competenciesExtracted: integer("competencies_extracted").default(0),
 });
 
 // Insert schemas
