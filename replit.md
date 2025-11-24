@@ -61,6 +61,14 @@ Preferred communication style: Simple, everyday language.
     - **AI Integration**: OpenAI via Replit AI Integrations for extracting structured competencies and analyzing project alignment.
     - **Project Planning Analysis**: `analyzeProjectPlanning` function analyzes complete project planning against BNCC competencies with coverage percentages and justifications.
     - **Endpoint**: POST `/api/projects/:id/planning/analyze` validates teacher auth, planning existence, and competencies before analysis.
+- **AI-Powered Competency Linking**:
+    - **UI**: "Analisar com IA" button in Planning tab, enabled only when planning is saved (has `id` field).
+    - **Modal**: BnccAnalysisModal displays AI suggestions with competency name, category, coverage percentage, description, and justification.
+    - **Selection**: Toggle buttons allow teachers to select/deselect suggested competencies; all selected by default.
+    - **Backend**: POST `/api/projects/:id/competencies` atomically replaces project competencies using Drizzle transaction (`db.transaction`).
+    - **Security**: Teacher authentication required, validates project ownership before allowing competency modifications.
+    - **Data Enrichment**: Analysis endpoint enriches AI responses with full competency objects (name, category, description).
+    - **Display**: "Competências BNCC Vinculadas" section shows linked competencies as cards with name and description.
 - **Teacher Feedback & Calendar System**:
     - **Feedback**: Teachers can post team-level feedback for projects (create, edit, delete).
     - **Calendar**: Teachers can schedule in-person meetings with teams (create, edit, delete events).
