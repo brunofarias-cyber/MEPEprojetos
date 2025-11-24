@@ -65,11 +65,13 @@ export default function TeacherRubrics() {
 
   const handleWeightBlur = (criteriaId: string) => {
     const editedCriteria = editingCriteria[criteriaId];
-    if (editedCriteria?.weight === undefined) return;
+    if (!editedCriteria || editedCriteria.weight === undefined) return;
+
+    const newWeight = editedCriteria.weight;
 
     // Calculate total with new weight
     const newTotal = projectRubrics.reduce((sum, c) => {
-      if (c.id === criteriaId) return sum + editedCriteria.weight;
+      if (c.id === criteriaId) return sum + newWeight;
       const editedWeight = editingCriteria[c.id]?.weight;
       return sum + (editedWeight !== undefined ? editedWeight : c.weight);
     }, 0);
@@ -90,7 +92,7 @@ export default function TeacherRubrics() {
       return;
     }
 
-    updateWeightMutation.mutate({ criteriaId, weight: editedCriteria.weight });
+    updateWeightMutation.mutate({ criteriaId, weight: newWeight });
   };
 
   const handleWeightKeyDown = (e: React.KeyboardEvent, criteriaId: string) => {

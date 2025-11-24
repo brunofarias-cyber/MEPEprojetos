@@ -137,6 +137,28 @@ export const classes = pgTable("classes", {
   engagement: integer("engagement").notNull().default(0), // 0-100%
 });
 
+// Feedbacks (general feedback for projects/teams)
+export const feedbacks = pgTable("feedbacks", {
+  id: varchar("id").primaryKey(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+  comment: text("comment").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Events (reunions, deadlines for projects)
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: text("date").notNull(), // YYYY-MM-DD format
+  time: text("time").notNull(), // HH:MM format
+  location: text("location").notNull(), // Physical location
+  projectId: varchar("project_id").references(() => projects.id, { onDelete: 'cascade' }), // Optional: link to project
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({ id: true });
@@ -151,6 +173,8 @@ export const insertProjectCompetencySchema = createInsertSchema(projectCompetenc
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true });
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true });
 export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({ id: true, uploadedAt: true });
+export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -191,6 +215,12 @@ export type InsertClass = z.infer<typeof insertClassSchema>;
 
 export type BnccDocument = typeof bnccDocuments.$inferSelect;
 export type InsertBnccDocument = z.infer<typeof insertBnccDocumentSchema>;
+
+export type Feedback = typeof feedbacks.$inferSelect;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
 
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };

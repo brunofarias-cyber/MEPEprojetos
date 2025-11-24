@@ -16,6 +16,8 @@ import type {
   Submission, InsertSubmission,
   Class, InsertClass,
   BnccDocument, InsertBnccDocument,
+  Feedback, InsertFeedback,
+  Event, InsertEvent,
   ProjectWithTeacher,
   StudentAchievementWithDetails,
 } from "@shared/schema";
@@ -96,6 +98,22 @@ export interface IStorage {
   getBnccDocuments(): Promise<BnccDocument[]>;
   createBnccDocument(document: InsertBnccDocument): Promise<BnccDocument>;
   updateBnccDocument(id: string, document: Partial<InsertBnccDocument>): Promise<BnccDocument | undefined>;
+
+  // Feedbacks
+  getFeedback(id: string): Promise<Feedback | undefined>;
+  getFeedbacksByProject(projectId: string): Promise<Feedback[]>;
+  createFeedback(feedback: InsertFeedback): Promise<Feedback>;
+  updateFeedback(id: string, comment: string): Promise<Feedback | undefined>;
+  deleteFeedback(id: string): Promise<boolean>;
+
+  // Events
+  getEvent(id: string): Promise<Event | undefined>;
+  getEvents(): Promise<Event[]>;
+  getEventsByTeacher(teacherId: string): Promise<Event[]>;
+  getEventsByProject(projectId: string): Promise<Event[]>;
+  createEvent(event: InsertEvent): Promise<Event>;
+  updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -426,6 +444,72 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.bnccDocuments.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  // Feedbacks
+  async getFeedback(id: string): Promise<Feedback | undefined> {
+    const [feedback] = await db.select().from(schema.feedbacks).where(eq(schema.feedbacks.id, id));
+    return feedback || undefined;
+  }
+
+  async getFeedbacksByProject(projectId: string): Promise<Feedback[]> {
+    return await db.select().from(schema.feedbacks).where(eq(schema.feedbacks.projectId, projectId));
+  }
+
+  async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
+    const id = randomUUID();
+    const [feedback] = await db.insert(schema.feedbacks).values({ ...insertFeedback, id }).returning();
+    return feedback;
+  }
+
+  async updateFeedback(id: string, comment: string): Promise<Feedback | undefined> {
+    const [updated] = await db.update(schema.feedbacks)
+      .set({ comment })
+      .where(eq(schema.feedbacks.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteFeedback(id: string): Promise<boolean> {
+    const result = await db.delete(schema.feedbacks).where(eq(schema.feedbacks.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Events
+  async getEvent(id: string): Promise<Event | undefined> {
+    const [event] = await db.select().from(schema.events).where(eq(schema.events.id, id));
+    return event || undefined;
+  }
+
+  async getEvents(): Promise<Event[]> {
+    return await db.select().from(schema.events);
+  }
+
+  async getEventsByTeacher(teacherId: string): Promise<Event[]> {
+    return await db.select().from(schema.events).where(eq(schema.events.teacherId, teacherId));
+  }
+
+  async getEventsByProject(projectId: string): Promise<Event[]> {
+    return await db.select().from(schema.events).where(eq(schema.events.projectId, projectId));
+  }
+
+  async createEvent(insertEvent: InsertEvent): Promise<Event> {
+    const id = randomUUID();
+    const [event] = await db.insert(schema.events).values({ ...insertEvent, id }).returning();
+    return event;
+  }
+
+  async updateEvent(id: string, eventUpdate: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [updated] = await db.update(schema.events)
+      .set(eventUpdate)
+      .where(eq(schema.events.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEvent(id: string): Promise<boolean> {
+    const result = await db.delete(schema.events).where(eq(schema.events.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

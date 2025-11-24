@@ -20,6 +20,8 @@ import {
   insertProjectCompetencySchema,
   insertSubmissionSchema,
   insertClassSchema,
+  insertFeedbackSchema,
+  insertEventSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -654,6 +656,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[BNCC Upload] Unexpected error:", error);
       res.status(500).json({ error: "Erro interno do servidor: " + error.message });
     }
+  });
+
+  // Feedbacks
+  app.get("/api/feedbacks/project/:projectId", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const feedbacks = await storage.getFeedbacksByProject(req.params.projectId);
+    res.json(feedbacks);
+  });
+
+  app.post("/api/feedbacks", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Only teachers can create feedbacks
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem criar feedbacks" });
+      }
+
+      const data = insertFeedbackSchema.parse(req.body);
+      const feedback = await storage.createFeedback(data);
+      res.status(201).json(feedback);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/feedbacks/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem editar feedbacks" });
+      }
+
+      const { comment } = req.body;
+      if (!comment) {
+        return res.status(400).json({ error: "Comentário é obrigatório" });
+      }
+
+      const feedback = await storage.updateFeedback(req.params.id, comment);
+      if (!feedback) return res.status(404).json({ error: "Feedback não encontrado" });
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/feedbacks/:id", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ error: "Apenas professores podem deletar feedbacks" });
+    }
+
+    const deleted = await storage.deleteFeedback(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Feedback não encontrado" });
+    res.status(204).send();
+  });
+
+  // Events
+  app.get("/api/events", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const events = await storage.getEvents();
+    res.json(events);
+  });
+
+  app.get("/api/events/teacher/:teacherId", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    const events = await storage.getEventsByTeacher(req.params.teacherId);
+    res.json(events);
+  });
+
+  app.post("/api/events", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Only teachers can create events
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem criar eventos" });
+      }
+
+      const data = insertEventSchema.parse(req.body);
+      const event = await storage.createEvent(data);
+      res.status(201).json(event);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/events/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem editar eventos" });
+      }
+
+      const data = insertEventSchema.partial().parse(req.body);
+      const event = await storage.updateEvent(req.params.id, data);
+      if (!event) return res.status(404).json({ error: "Evento não encontrado" });
+      res.json(event);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/events/:id", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ error: "Apenas professores podem deletar eventos" });
+    }
+
+    const deleted = await storage.deleteEvent(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Evento não encontrado" });
+    res.status(204).send();
   });
 
   // AI-powered project alignment analysis
