@@ -73,6 +73,22 @@ Preferred communication style: Simple, everyday language.
     - **Feedback**: Teachers can post team-level feedback for projects (create, edit, delete).
     - **Calendar**: Teachers can schedule in-person meetings with teams (create, edit, delete events).
     - **Backend**: `feedbacks` and `events` tables, Zod validation, teacher-role enforcement.
+- **Teacher Dashboard - "Sua Rotina Hoje" (Pending Actions)**:
+    - **Purpose**: Proactive dashboard widget showing teacher's pending tasks and upcoming events.
+    - **Metrics Displayed**:
+        - Projects without planning (count + link to projects)
+        - Projects without BNCC competencies (count + link to projects)
+        - Upcoming deadlines (next 7 days, with project titles and dates)
+        - Upcoming events (next 3 days, with event titles and dates)
+    - **Backend Performance**:
+        - Endpoint: GET `/api/teachers/me/pending-actions` (uses session-based teacher ID)
+        - Storage method: `getPendingActions(teacherId)` in `storage.ts`
+        - Query optimization: Uses `inArray()` for batch queries (O(1) queries, not O(N))
+        - Total queries: 3 constant queries (projects, planning batch, competencies batch) regardless of data volume
+        - Early return optimization when teacher has no projects
+    - **Security**: Endpoint uses `/me` pattern to prevent teacher ID enumeration and privilege escalation
+    - **Frontend**: `PendingActionsCard.tsx` component with glassmorphism design, lucide-react icons, conditional empty state
+    - **UI States**: Shows celebration message when no pending actions; otherwise displays categorized action items with badge counters
 
 ## External Dependencies
 
