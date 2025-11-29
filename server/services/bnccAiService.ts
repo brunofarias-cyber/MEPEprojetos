@@ -1,11 +1,17 @@
 import OpenAI from "openai";
 import type { BnccCompetency, InsertBnccCompetency } from "@shared/schema";
 
-// Initialize OpenAI client with Replit AI Integrations
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
+// Helper to safely get OpenAI client
+function getOpenAIClient() {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+  return new OpenAI({
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    apiKey: apiKey,
+  });
+}
 
 export interface ExtractedCompetency {
   name: string;
@@ -18,6 +24,12 @@ export interface ExtractedCompetency {
  */
 export async function extractCompetenciesFromText(pdfText: string): Promise<ExtractedCompetency[]> {
   try {
+    const openai = getOpenAIClient();
+    if (!openai) {
+      console.warn("[BNCC AI Service] OpenAI API key not found. Skipping competency extraction.");
+      return [];
+    }
+
     const prompt = `Você é um especialista em educação brasileira e na Base Nacional Comum Curricular (BNCC).
 
 Analise o texto extraído do documento da BNCC fornecido abaixo e extraia TODAS as competências gerais e específicas mencionadas.
@@ -58,7 +70,7 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     });
 
     const responseText = completion.choices[0]?.message?.content || "[]";
-    
+
     // Extract JSON from response (handle cases where AI adds markdown code blocks)
     let jsonText = responseText.trim();
     if (jsonText.startsWith("```json")) {
@@ -66,12 +78,13 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     } else if (jsonText.startsWith("```")) {
       jsonText = jsonText.replace(/```\n?/g, "").trim();
     }
-    
+
     const competencies: ExtractedCompetency[] = JSON.parse(jsonText);
     return competencies;
   } catch (error) {
     console.error("[BNCC AI Service] Error extracting competencies:", error);
-    throw new Error("Failed to extract competencies from PDF text");
+    // Return empty array instead of throwing to prevent app crash
+    return [];
   }
 }
 
@@ -91,7 +104,13 @@ export async function analyzeProjectPlanning(
   availableCompetencies: BnccCompetency[]
 ): Promise<{ competencyId: string; coverage: number; justification: string }[]> {
   try {
-    const competenciesList = availableCompetencies.map(c => 
+    const openai = getOpenAIClient();
+    if (!openai) {
+      console.warn("[BNCC AI Service] OpenAI API key not found. Skipping project planning analysis.");
+      return [];
+    }
+
+    const competenciesList = availableCompetencies.map(c =>
       `ID: ${c.id}\nNome: ${c.name}\nCategoria: ${c.category}\nDescrição: ${c.description || 'N/A'}`
     ).join("\n\n");
 
@@ -148,7 +167,7 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     });
 
     const responseText = completion.choices[0]?.message?.content || "[]";
-    
+
     // Extract JSON from response
     let jsonText = responseText.trim();
     if (jsonText.startsWith("```json")) {
@@ -156,12 +175,12 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     } else if (jsonText.startsWith("```")) {
       jsonText = jsonText.replace(/```\n?/g, "").trim();
     }
-    
+
     const alignments = JSON.parse(jsonText);
     return alignments;
   } catch (error) {
     console.error("[BNCC AI Service] Error analyzing project planning:", error);
-    throw new Error("Failed to analyze project planning");
+    return [];
   }
 }
 
@@ -175,7 +194,13 @@ export async function analyzeProjectAlignment(
   availableCompetencies: BnccCompetency[]
 ): Promise<{ competencyId: string; coverage: number; justification: string }[]> {
   try {
-    const competenciesList = availableCompetencies.map(c => 
+    const openai = getOpenAIClient();
+    if (!openai) {
+      console.warn("[BNCC AI Service] OpenAI API key not found. Skipping project alignment analysis.");
+      return [];
+    }
+
+    const competenciesList = availableCompetencies.map(c =>
       `ID: ${c.id}\nNome: ${c.name}\nCategoria: ${c.category}\nDescrição: ${c.description || 'N/A'}`
     ).join("\n\n");
 
@@ -226,7 +251,7 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     });
 
     const responseText = completion.choices[0]?.message?.content || "[]";
-    
+
     // Extract JSON from response
     let jsonText = responseText.trim();
     if (jsonText.startsWith("```json")) {
@@ -234,11 +259,11 @@ Retorne APENAS o array JSON, sem nenhum texto adicional.`;
     } else if (jsonText.startsWith("```")) {
       jsonText = jsonText.replace(/```\n?/g, "").trim();
     }
-    
+
     const alignments = JSON.parse(jsonText);
     return alignments;
   } catch (error) {
     console.error("[BNCC AI Service] Error analyzing project alignment:", error);
-    throw new Error("Failed to analyze project alignment");
+    return [];
   }
 }
