@@ -3,6 +3,7 @@ import { Icon } from "@/components/Icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { CreateClassModal } from "@/components/CreateClassModal";
 import { SpreadsheetImport } from "@/components/SpreadsheetImport";
+import { ManageClassModal } from "@/components/ManageClassModal";
 import type { Class } from "@shared/schema";
 
 export default function TeacherClasses() {
@@ -53,7 +54,7 @@ export default function TeacherClasses() {
           <CreateClassModal />
         </div>
       </div>
-      
+
       {classes.length === 0 ? (
         <div className="bg-card border border-card-border p-12 rounded-2xl text-center">
           <Icon name="users" className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -70,15 +71,19 @@ export default function TeacherClasses() {
                   {classItem.studentCount} Alunos
                 </span>
               </div>
-              
+
               <div className="h-2 bg-muted rounded-full overflow-hidden mb-2">
-                <div 
-                  className="h-full bg-primary transition-all duration-1000" 
+                <div
+                  className="h-full bg-primary transition-all duration-1000"
                   style={{ width: `${classItem.engagement}%` }}
                   data-testid={`progress-engagement-${classItem.id}`}
                 ></div>
               </div>
               <p className="text-xs text-muted-foreground" data-testid={`text-engagement-${classItem.id}`}>{classItem.engagement}% de Engajamento</p>
+
+              <div className="mt-4 pt-4 border-t flex justify-end">
+                <ManageClassModal classId={classItem.id} className={classItem.name} />
+              </div>
             </div>
           ))}
         </div>

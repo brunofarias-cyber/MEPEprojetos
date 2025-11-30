@@ -30,7 +30,7 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
     if (role === 'student') return 'Aluno';
     if (role === 'coordinator') return 'Coordenador';
   };
-  
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -39,7 +39,7 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
           <h1 className="text-2xl font-extrabold text-foreground tracking-tight">BProjetos</h1>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
@@ -70,6 +70,14 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                       <Link href="/classes" data-testid="nav-turmas">
                         <Icon name="users" size={20} />
                         <span>Turmas</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/attendance'}>
+                      <Link href="/attendance" data-testid="nav-chamada">
+                        <Icon name="clipboardList" size={20} />
+                        <span>Chamada</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

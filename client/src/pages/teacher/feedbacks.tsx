@@ -11,11 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Project, Feedback, Teacher } from "@shared/schema";
+import type { Project, Feedback, Teacher, Student } from "@shared/schema";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const feedbackFormSchema = z.object({
   projectId: z.string().min(1, "Selecione um projeto"),
-  comment: z.string().min(1, "Digite um comentário"),
+  studentId: z.string().optional(),
+  comment: z.string().min(1, "Digite o feedback"),
 });
 
 type FeedbackFormData = z.infer<typeof feedbackFormSchema>;
@@ -34,6 +37,10 @@ export default function TeacherFeedback() {
     queryKey: ["/api/projects"],
   });
 
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students"],
+  });
+
   const { data: feedbacks = [], isLoading: feedbacksLoading } = useQuery<Feedback[]>({
     queryKey: ["/api/feedbacks/project", selectedProjectId],
     enabled: !!selectedProjectId,
@@ -43,6 +50,7 @@ export default function TeacherFeedback() {
     resolver: zodResolver(feedbackFormSchema),
     defaultValues: {
       projectId: "",
+      studentId: "all", // "all" for team feedback, specific ID for student
       comment: "",
     },
   });
@@ -57,7 +65,7 @@ export default function TeacherFeedback() {
   }, [projects, selectedProjectId, form]);
 
   const createMutation = useMutation({
-    mutationFn: async (data: { teacherId: string; projectId: string; comment: string }) => {
+    mutationFn: async (data: { teacherId: string; projectId: string; studentId?: string | null; comment: string }) => {
       return await apiRequest(`/api/feedbacks`, {
         method: "POST",
         body: JSON.stringify(data),
@@ -66,7 +74,7 @@ export default function TeacherFeedback() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedbacks/project", selectedProjectId] });
       // Reset only the comment field, keep projectId selected
-      form.reset({ projectId: selectedProjectId, comment: "" });
+      form.reset({ projectId: selectedProjectId, studentId: "all", comment: "" });
       toast({
         title: "Feedback adicionado",
         description: "O feedback foi registrado com sucesso.",
@@ -141,6 +149,7 @@ export default function TeacherFeedback() {
     createMutation.mutate({
       teacherId: teacher.id,
       projectId: data.projectId,
+      studentId: data.studentId === "all" ? null : data.studentId,
       comment: data.comment,
     });
   };
@@ -199,15 +208,12 @@ export default function TeacherFeedback() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Projeto</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          setSelectedProjectId(value);
-                        }}
-                      >
+                      <Select value={field.value} onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedProjectId(value);
+                      }}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-project">
+                          <SelectTrigger data-testid="select-feedback-project">
                             <SelectValue placeholder="Selecione um projeto" />
                           </SelectTrigger>
                         </FormControl>
@@ -215,6 +221,32 @@ export default function TeacherFeedback() {
                           {projects.map((project) => (
                             <SelectItem key={project.id} value={project.id}>
                               {project.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="studentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Destinatário</FormLabel>
+                      <Select value={field.value || "all"} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-feedback-student">
+                            <SelectValue placeholder="Selecione o destinatário" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">Toda a Equipe</SelectItem>
+                          {students.map((student) => (
+                            <SelectItem key={student.id} value={student.id}>
+                              {student.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -278,72 +310,91 @@ export default function TeacherFeedback() {
                   Seja o primeiro a deixar um feedback para este projeto!
                 </div>
               ) : (
-                feedbacks.map((feedback) => (
-                  <Card key={feedback.id} className="border-l-4 border-l-primary" data-testid={`card-feedback-${feedback.id}`}>
-                    <CardContent className="pt-6">
-                      {editingId === feedback.id ? (
-                        <div className="space-y-4">
-                          <Textarea
-                            value={editingComment}
-                            onChange={(e) => setEditingComment(e.target.value)}
-                            rows={4}
-                            className="resize-none"
-                            data-testid={`input-edit-feedback-${feedback.id}`}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleEditSubmit(feedback.id)}
-                              disabled={updateMutation.isPending || !editingComment.trim()}
-                              data-testid={`button-save-feedback-${feedback.id}`}
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-2" />
-                              {updateMutation.isPending ? "Salvando..." : "Salvar"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={cancelEdit}
-                              data-testid={`button-cancel-edit-${feedback.id}`}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="text-sm font-semibold text-primary" data-testid={`text-feedback-label-${feedback.id}`}>
-                              Feedback de Equipe
-                            </div>
+                feedbacks.map((feedback) => {
+                  const project = projects.find(p => p.id === feedback.projectId);
+                  return (
+                    <Card key={feedback.id} className="border-l-4 border-l-primary" data-testid={`card-feedback-${feedback.id}`}>
+                      <CardContent className="pt-6">
+                        {editingId === feedback.id ? (
+                          <div className="space-y-4">
+                            <Textarea
+                              value={editingComment}
+                              onChange={(e) => setEditingComment(e.target.value)}
+                              rows={4}
+                              className="resize-none"
+                              data-testid={`input-edit-feedback-${feedback.id}`}
+                            />
                             <div className="flex gap-2">
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => startEdit(feedback)}
-                                data-testid={`button-edit-feedback-${feedback.id}`}
+                                size="sm"
+                                onClick={() => handleEditSubmit(feedback.id)}
+                                disabled={updateMutation.isPending || !editingComment.trim()}
+                                data-testid={`button-save-feedback-${feedback.id}`}
                               >
-                                <Edit2 className="w-4 h-4" />
+                                <CheckCircle2 className="w-4 h-4 mr-2" />
+                                {updateMutation.isPending ? "Salvando..." : "Salvar"}
                               </Button>
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => deleteMutation.mutate(feedback.id)}
-                                disabled={deleteMutation.isPending}
-                                data-testid={`button-delete-feedback-${feedback.id}`}
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelEdit}
+                                data-testid={`button-cancel-edit-${feedback.id}`}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                Cancelar
                               </Button>
                             </div>
                           </div>
-                          <p className="text-sm text-foreground whitespace-pre-wrap" data-testid={`text-feedback-comment-${feedback.id}`}>
-                            {feedback.comment}
-                          </p>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <CardTitle className="text-lg mb-1" data-testid={`text-feedback-project-${feedback.id}`}>
+                                  {project?.title}
+                                </CardTitle>
+                                <div className="flex gap-2 mb-2">
+                                  <span className="text-sm text-muted-foreground" data-testid={`text-feedback-date-${feedback.id}`}>
+                                    {format(new Date(feedback.createdAt), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                                  </span>
+                                  {feedback.studentId ? (
+                                    <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 rounded">
+                                      Para: {students.find(s => s.id === feedback.studentId)?.name || "Aluno"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm font-medium text-green-600 bg-green-50 px-2 rounded">
+                                      Para: Equipe
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => startEdit(feedback)}
+                                  data-testid={`button-edit-feedback-${feedback.id}`}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => deleteMutation.mutate(feedback.id)}
+                                  disabled={deleteMutation.isPending}
+                                  data-testid={`button-delete-feedback-${feedback.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-sm text-foreground whitespace-pre-wrap" data-testid={`text-feedback-comment-${feedback.id}`}>
+                              {feedback.comment}
+                            </p>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </CardContent>
           </Card>

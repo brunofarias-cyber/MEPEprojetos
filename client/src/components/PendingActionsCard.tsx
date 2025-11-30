@@ -18,10 +18,10 @@ interface PendingActionsCardProps {
 }
 
 export function PendingActionsCard({ data }: PendingActionsCardProps) {
-  const totalPending = 
-    data.projectsWithoutPlanning + 
-    data.projectsWithoutCompetencies + 
-    data.upcomingDeadlines.length + 
+  const totalPending =
+    data.projectsWithoutPlanning +
+    data.projectsWithoutCompetencies +
+    data.upcomingDeadlines.length +
     data.upcomingEvents.length;
 
   if (totalPending === 0) {
@@ -67,7 +67,7 @@ export function PendingActionsCard({ data }: PendingActionsCardProps) {
               <p className="text-sm text-muted-foreground mb-2">
                 {data.projectsWithoutPlanning} {data.projectsWithoutPlanning === 1 ? 'projeto precisa' : 'projetos precisam'} de um planejamento detalhado
               </p>
-              <Link href="/">
+              <Link href="/?filter=Planejamento">
                 <Button variant="ghost" size="sm" className="h-8" data-testid="button-view-projects-without-planning">
                   Ver projetos
                 </Button>
@@ -91,7 +91,7 @@ export function PendingActionsCard({ data }: PendingActionsCardProps) {
               <p className="text-sm text-muted-foreground mb-2">
                 {data.projectsWithoutCompetencies} {data.projectsWithoutCompetencies === 1 ? 'projeto precisa' : 'projetos precisam'} de competências BNCC vinculadas
               </p>
-              <Link href="/">
+              <Link href="/?filter=Planejamento">
                 <Button variant="ghost" size="sm" className="h-8" data-testid="button-view-projects-without-competencies">
                   Ver projetos
                 </Button>

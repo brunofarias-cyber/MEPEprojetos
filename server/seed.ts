@@ -97,9 +97,9 @@ export async function seedDatabase() {
 
   // Seed Classes
   const classesData: InsertClass[] = [
-    { name: "1º Ano A", studentCount: 32, engagement: 75 },
-    { name: "2º Ano B", studentCount: 28, engagement: 82 },
-    { name: "3º Ano C", studentCount: 30, engagement: 68 },
+    { name: "1º Ano A", studentCount: 32, engagement: 75, teacherId: teachers[0].id },
+    { name: "2º Ano B", studentCount: 28, engagement: 82, teacherId: teachers[1].id },
+    { name: "3º Ano C", studentCount: 30, engagement: 68, teacherId: teachers[2].id },
   ];
 
   for (const c of classesData) {

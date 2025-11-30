@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { Project, Event, Teacher } from "@shared/schema";
+import type { Project, Event, Teacher, Submission } from "@shared/schema";
 
 const eventFormSchema = z.object({
   projectId: z.string().optional(),
@@ -45,6 +45,29 @@ export default function TeacherCalendar() {
     queryKey: ["/api/events/teacher", teacher?.id],
     enabled: !!teacher?.id,
   });
+
+  // Fetch all submissions for all projects (to show in calendar)
+  const { data: allSubmissions = [] } = useQuery<Submission[]>({
+    queryKey: ["/api/submissions/all"], // We might need a new route or just filter client side if we fetch per project. 
+    // Since we don't have a "get all submissions" route for teacher easily, let's iterate projects or add a route.
+    // For now, let's assume we can get them or just show project deadlines which are more critical.
+    // Actually, let's stick to Project Deadlines first as requested "datas importantes".
+  });
+
+  // Combine events with project deadlines
+  const combinedEvents = [
+    ...events.map(e => ({ ...e, type: 'meeting' })),
+    ...projects.filter(p => p.nextDeadline).map(p => ({
+      id: `deadline-${p.id}`,
+      title: `Entrega: ${p.title}`,
+      description: p.deadlineLabel || "Prazo de entrega do projeto",
+      date: p.nextDeadline!.split('T')[0],
+      time: "23:59",
+      location: "Online",
+      projectId: p.id,
+      type: 'deadline'
+    }))
+  ];
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventFormSchema),
@@ -178,7 +201,7 @@ export default function TeacherCalendar() {
     });
   };
 
-  const sortedEvents = [...events].sort((a, b) => {
+  const sortedEvents = [...combinedEvents].sort((a, b) => {
     const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
     const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
     return dateTimeA - dateTimeB;
@@ -379,8 +402,10 @@ export default function TeacherCalendar() {
               const project = projects.find((p) => p.id === event.projectId);
               const eventDate = new Date(`${event.date}T${event.time}`);
 
+              const isDeadline = (event as any).type === 'deadline';
+
               return (
-                <Card key={event.id} className="hover-elevate" data-testid={`card-event-${event.id}`}>
+                <Card key={event.id} className={`hover-elevate ${isDeadline ? 'border-l-4 border-l-orange-500 bg-orange-50/30' : ''}`} data-testid={`card-event-${event.id}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -415,167 +440,175 @@ export default function TeacherCalendar() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Dialog
-                          open={editingEvent?.id === event.id}
-                          onOpenChange={(open) => {
-                            if (!open) {
-                              setEditingEvent(null);
-                              editForm.reset();
-                            }
-                          }}
-                        >
-                          <DialogTrigger asChild>
+                        {!(event as any).type || (event as any).type === 'meeting' ? (
+                          <>
+                            <Dialog
+                              open={editingEvent?.id === event.id}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setEditingEvent(null);
+                                  editForm.reset();
+                                }
+                              }}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => startEdit(event as Event)}
+                                  data-testid={`button-edit-event-${event.id}`}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Editar Reunião</DialogTitle>
+                                </DialogHeader>
+
+                                <Form {...editForm}>
+                                  <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                                    <FormField
+                                      control={editForm.control}
+                                      name="title"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Título *</FormLabel>
+                                          <FormControl>
+                                            <Input data-testid="input-edit-event-title" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <FormField
+                                      control={editForm.control}
+                                      name="projectId"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Projeto</FormLabel>
+                                          <Select value={field.value} onValueChange={field.onChange}>
+                                            <FormControl>
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="Selecione um projeto" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              <SelectItem value="">Nenhum projeto</SelectItem>
+                                              {projects.map((project) => (
+                                                <SelectItem key={project.id} value={project.id}>
+                                                  {project.title}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <FormField
+                                        control={editForm.control}
+                                        name="eventDate"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel>Data *</FormLabel>
+                                            <FormControl>
+                                              <Input type="date" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+
+                                      <FormField
+                                        control={editForm.control}
+                                        name="eventTime"
+                                        render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel>Horário *</FormLabel>
+                                            <FormControl>
+                                              <Input type="time" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                          </FormItem>
+                                        )}
+                                      />
+                                    </div>
+
+                                    <FormField
+                                      control={editForm.control}
+                                      name="location"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Local *</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <FormField
+                                      control={editForm.control}
+                                      name="description"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Descrição</FormLabel>
+                                          <FormControl>
+                                            <Textarea
+                                              rows={3}
+                                              className="resize-none"
+                                              {...field}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <DialogFooter>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingEvent(null);
+                                          editForm.reset();
+                                        }}
+                                      >
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        type="submit"
+                                        disabled={updateMutation.isPending}
+                                        data-testid="button-update-event"
+                                      >
+                                        {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                                      </Button>
+                                    </DialogFooter>
+                                  </form>
+                                </Form>
+                              </DialogContent>
+                            </Dialog>
+
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => startEdit(event)}
-                              data-testid={`button-edit-event-${event.id}`}
+                              onClick={() => deleteMutation.mutate(event.id)}
+                              disabled={deleteMutation.isPending}
+                              data-testid={`button-delete-event-${event.id}`}
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Editar Reunião</DialogTitle>
-                            </DialogHeader>
-
-                            <Form {...editForm}>
-                              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                                <FormField
-                                  control={editForm.control}
-                                  name="title"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Título *</FormLabel>
-                                      <FormControl>
-                                        <Input data-testid="input-edit-event-title" {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <FormField
-                                  control={editForm.control}
-                                  name="projectId"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Projeto</FormLabel>
-                                      <Select value={field.value} onValueChange={field.onChange}>
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Selecione um projeto" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="">Nenhum projeto</SelectItem>
-                                          {projects.map((project) => (
-                                            <SelectItem key={project.id} value={project.id}>
-                                              {project.title}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <div className="grid grid-cols-2 gap-4">
-                                  <FormField
-                                    control={editForm.control}
-                                    name="eventDate"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Data *</FormLabel>
-                                        <FormControl>
-                                          <Input type="date" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={editForm.control}
-                                    name="eventTime"
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Horário *</FormLabel>
-                                        <FormControl>
-                                          <Input type="time" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                </div>
-
-                                <FormField
-                                  control={editForm.control}
-                                  name="location"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Local *</FormLabel>
-                                      <FormControl>
-                                        <Input {...field} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <FormField
-                                  control={editForm.control}
-                                  name="description"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Descrição</FormLabel>
-                                      <FormControl>
-                                        <Textarea
-                                          rows={3}
-                                          className="resize-none"
-                                          {...field}
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-
-                                <DialogFooter>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setEditingEvent(null);
-                                      editForm.reset();
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                  <Button
-                                    type="submit"
-                                    disabled={updateMutation.isPending}
-                                    data-testid="button-update-event"
-                                  >
-                                    {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
-                                  </Button>
-                                </DialogFooter>
-                              </form>
-                            </Form>
-                          </DialogContent>
-                        </Dialog>
-
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => deleteMutation.mutate(event.id)}
-                          disabled={deleteMutation.isPending}
-                          data-testid={`button-delete-event-${event.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          </>
+                        ) : (
+                          <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium border border-orange-200">
+                            Prazo
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardHeader>

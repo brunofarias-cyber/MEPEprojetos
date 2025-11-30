@@ -9,7 +9,7 @@ async function throwIfResNotOk(res: Response) {
 
 export async function apiRequest(
   url: string,
-  options?: RequestInit & { body?: any },
+  options?: Omit<RequestInit, 'body'> & { body?: any },
 ): Promise<any> {
   // Get JWT token from localStorage for authentication
   const token = localStorage.getItem('bprojetos_token');
@@ -34,7 +34,7 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  
+
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
     return await res.json();
@@ -47,27 +47,27 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    // Get JWT token from localStorage for authentication
-    const token = localStorage.getItem('bprojetos_token');
-    
-    const headers = new Headers();
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
+    async ({ queryKey }) => {
+      // Get JWT token from localStorage for authentication
+      const token = localStorage.getItem('bprojetos_token');
 
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-      headers,
-    });
+      const headers = new Headers();
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
+      const res = await fetch(queryKey.join("/") as string, {
+        credentials: "include",
+        headers,
+      });
 
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
+      }
+
+      await throwIfResNotOk(res);
+      return await res.json();
+    };
 
 export const queryClient = new QueryClient({
   defaultOptions: {

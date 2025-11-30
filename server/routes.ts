@@ -9,11 +9,11 @@ import { storage } from "./storage";
 import { extractCompetenciesFromText, analyzeProjectAlignment, analyzeProjectPlanning } from "./services/bnccAiService";
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-secret-change-in-production';
-import { 
+import {
   insertUserSchema,
   insertProjectSchema,
   insertProjectPlanningSchema,
-  insertTeacherSchema, 
+  insertTeacherSchema,
   insertRubricCriteriaSchema,
   insertStudentSchema,
   insertAchievementSchema,
@@ -24,6 +24,8 @@ import {
   insertClassSchema,
   insertFeedbackSchema,
   insertEventSchema,
+  insertAttendanceSchema,
+  insertStudentClassSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -89,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const data = registerSchema.parse(req.body);
-      
+
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(data.email);
       if (existingUser) {
@@ -359,7 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/projects/:id", async (req, res) => {
     const project = await storage.getProject(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
-    
+
     const teacher = await storage.getTeacher(project.teacherId);
     res.json({
       ...project,
@@ -455,7 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = insertProjectPlanningSchema.partial().parse(req.body);
       const planning = await storage.updateProjectPlanning(req.params.id, data);
-      
+
       if (!planning) {
         return res.status(404).json({ error: "Planejamento não encontrado" });
       }
@@ -768,6 +770,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Grade submission
+  app.post("/api/submissions/:id/grade", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem avaliar submissões" });
+      }
+
+      const { grade, feedback } = req.body;
+      if (grade === undefined || grade < 0 || grade > 100) {
+        return res.status(400).json({ error: "Nota inválida (deve ser entre 0 e 100)" });
+      }
+
+      const submission = await storage.gradeSubmission(req.params.id, grade, feedback);
+      if (!submission) return res.status(404).json({ error: "Submissão não encontrada" });
+
+      res.json(submission);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Project Students
+  app.get("/api/projects/:id/students", async (req, res) => {
+    try {
+      const students = await storage.getProjectStudents(req.params.id);
+      res.json(students);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Attendance
+  app.post("/api/attendance", async (req, res) => {
+    try {
+      const data = insertAttendanceSchema.parse(req.body);
+      const attendance = await storage.createAttendance(data);
+      res.status(201).json(attendance);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/attendance/:classId", async (req, res) => {
+    try {
+      const { date } = req.query;
+      if (!date || typeof date !== 'string') {
+        return res.status(400).json({ error: "Date parameter is required" });
+      }
+      const attendance = await storage.getAttendanceByClass(req.params.classId, date);
+      res.json(attendance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI Analysis for Submissions
+  app.post("/api/submissions/:id/analyze", async (req, res) => {
+    try {
+      // Mock AI Analysis for now
+      // In a real implementation, this would call an AI service to analyze the submission content
+      // against the BNCC competencies and project rubrics.
+
+      const submissionId = req.params.id;
+      // Fetch submission details if needed
+
+      // Mock response
+      const analysis = {
+        grade: 85,
+        feedback: "O trabalho demonstra um bom entendimento dos conceitos. A estrutura está clara e os objetivos foram alcançados. Sugiro aprofundar um pouco mais na metodologia.",
+        bnccAlignment: [
+          { competency: "Pensamento Científico, Crítico e Criativo", score: 90 },
+          { competency: "Comunicação", score: 80 }
+        ]
+      };
+
+      // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      res.json(analysis);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Feedbacks (Updated to include studentId)
+  app.post("/api/feedbacks", async (req, res) => {
+    try {
+      const data = insertFeedbackSchema.parse(req.body);
+      const feedback = await storage.createFeedback(data);
+      res.status(201).json(feedback);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/feedbacks/:id", async (req, res) => {
+    try {
+      const { comment } = req.body;
+      const feedback = await storage.updateFeedback(req.params.id, comment);
+      if (!feedback) return res.status(404).json({ error: "Feedback not found" });
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/feedbacks/:id", async (req, res) => {
+    const deleted = await storage.deleteFeedback(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Feedback not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/feedbacks/project/:projectId", async (req, res) => {
+    const feedbacks = await storage.getFeedbacksByProject(req.params.projectId);
+    res.json(feedbacks);
+  });
+
   // Classes
   app.get("/api/classes", async (req, res) => {
     const classes = await storage.getClasses();
@@ -787,6 +906,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(classData);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Student Classes (Enrollments)
+  app.post("/api/classes/:id/students", async (req, res) => {
+    try {
+      const data = insertStudentClassSchema.parse({
+        ...req.body,
+        classId: req.params.id,
+      });
+      const studentClass = await storage.addStudentToClass(data);
+      res.status(201).json(studentClass);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/classes/:id/students/:studentId", async (req, res) => {
+    try {
+      await storage.removeStudentFromClass(req.params.id, req.params.studentId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/classes/:id/students", async (req, res) => {
+    try {
+      const students = await storage.getStudentsByClass(req.params.id);
+      res.json(students);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -833,10 +984,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get first sheet
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      
+
       // Convert to JSON
       const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-      
+
       if (rawData.length === 0) {
         return res.status(400).json({ error: "A planilha está vazia" });
       }
@@ -847,30 +998,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-detect columns (case-insensitive, flexible matching with normalization)
       const firstRow = rawData[0];
       const originalKeys = Object.keys(firstRow);
-      
+
       // Normalize column names: lowercase, remove accents, trim
       const normalizeString = (str: string) => {
         return str.toLowerCase()
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
           .trim();
       };
-      
+
       const normalizedKeys = originalKeys.map(normalizeString);
-      
+
       // Find column mappings with normalized comparisons
-      const nameIndex = normalizedKeys.findIndex(k => 
+      const nameIndex = normalizedKeys.findIndex(k =>
         k.includes('nome') || k.includes('name') || k.includes('aluno') || k.includes('student')
       );
-      const emailIndex = normalizedKeys.findIndex(k => 
+      const emailIndex = normalizedKeys.findIndex(k =>
         k.includes('email') || k.includes('e-mail') || k === 'email'
       );
-      const classIndex = normalizedKeys.findIndex(k => 
+      const classIndex = normalizedKeys.findIndex(k =>
         k.includes('turma') || k.includes('class') || k.includes('sala')
       );
 
       if (nameIndex === -1 || emailIndex === -1) {
-        return res.status(400).json({ 
-          error: "Planilha deve conter colunas 'Nome' e 'Email' (colunas detectadas: " + originalKeys.join(', ') + ")" 
+        return res.status(400).json({
+          error: "Planilha deve conter colunas 'Nome' e 'Email' (colunas detectadas: " + originalKeys.join(', ') + ")"
         });
       }
 
@@ -915,7 +1066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Check if user already exists
           const existingUser = await storage.getUserByEmail(email);
-          
+
           if (existingUser) {
             // User exists - update student if needed
             if (existingUser.role === 'student') {
@@ -928,7 +1079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             // Create new user and student
             const hashedPassword = await bcrypt.hash('123456', 10); // Default password
-            
+
             const user = await storage.createUser({
               email,
               hashedPassword,
@@ -1226,16 +1377,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const studentId = req.params.studentId;
-      
+
       // Get all projects the student has submitted to
       const allProjects = await storage.getProjects();
-      
+
       // For now, get all events and let frontend filter by project
       // This is simpler than querying submissions
       const allEvents = await storage.getEvents();
-      
+
       const eventsWithResponses = [];
-      
+
       for (const event of allEvents) {
         const response = await storage.getEventResponse(event.id, studentId);
         eventsWithResponses.push({
@@ -1244,7 +1395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           respondedAt: response?.respondedAt || null,
         });
       }
-      
+
       res.json(eventsWithResponses);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1271,7 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if response already exists
       const existing = await storage.getEventResponse(eventId, studentId);
-      
+
       if (existing) {
         // Update existing response
         const updated = await storage.updateEventResponse(eventId, studentId, status);
@@ -1302,17 +1453,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const events = await storage.getEvents();
-      
+
       // Add response statistics to each event
       const eventsWithStats = await Promise.all(events.map(async (event) => {
         const responses = await storage.getEventResponsesByEvent(event.id);
         const accepted = responses.filter(r => r.status === 'accepted').length;
         const rejected = responses.filter(r => r.status === 'rejected').length;
         const pending = responses.filter(r => r.status === 'pending').length;
-        
+
         // Get teacher name
         const teacher = await storage.getTeacher(event.teacherId);
-        
+
         return {
           ...event,
           teacherName: teacher?.name || 'Desconhecido',
@@ -1324,7 +1475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         };
       }));
-      
+
       res.json(eventsWithStats);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

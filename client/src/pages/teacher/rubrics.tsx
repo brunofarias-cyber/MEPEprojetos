@@ -5,10 +5,15 @@ import { ImportRubricModal } from "@/components/ImportRubricModal";
 import type { RubricCriteria, ProjectWithTeacher } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function TeacherRubrics() {
   const { toast } = useToast();
-  
+
   // Fetch projects to allow selection
   const { data: projects = [] } = useQuery<ProjectWithTeacher[]>({
     queryKey: ['/api/projects'],
@@ -32,29 +37,60 @@ export default function TeacherRubrics() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
+  const [editingLevelsId, setEditingLevelsId] = useState<string | null>(null);
+
   // Update weight mutation
-  const updateWeightMutation = useMutation({
-    mutationFn: async ({ criteriaId, weight }: { criteriaId: string; weight: number }) => {
-      return apiRequest(`/api/rubrics/${criteriaId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ weight }),
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, weight, criteria, level1, level2, level3, level4 }: Partial<RubricCriteria> & { id: string }) => {
+      return await apiRequest(`/api/rubrics/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ weight, criteria, level1, level2, level3, level4 }),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/rubrics/${selectedProjectId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rubrics", selectedProjectId] });
+      setEditingLevelsId(null);
       toast({
-        title: "Peso atualizado",
-        description: "O peso do critério foi atualizado com sucesso.",
+        title: "Critério atualizado",
+        description: "As alterações foram salvas com sucesso.",
       });
     },
     onError: () => {
       toast({
-        title: "Erro ao atualizar",
-        description: "Não foi possível atualizar o peso do critério.",
+        title: "Erro",
+        description: "Não foi possível atualizar o critério.",
         variant: "destructive",
       });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/rubrics/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rubrics", selectedProjectId] });
+      toast({
+        title: "Critério excluído",
+        description: "O critério foi removido com sucesso.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o critério.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCriteriaChange = (id: string, newCriteria: string) => {
+    // Debounce or save on blur could be better, but for now let's save on blur
+    // We'll just update local state if we had one, but we are using the input directly.
+    // Let's use onBlur to trigger save.
+  };
 
   const handleWeightChange = (criteriaId: string, newWeight: number) => {
     setEditingCriteria(prev => ({
@@ -92,7 +128,7 @@ export default function TeacherRubrics() {
       return;
     }
 
-    updateWeightMutation.mutate({ criteriaId, weight: newWeight });
+    updateMutation.mutate({ id: criteriaId, weight: newWeight });
   };
 
   const handleWeightKeyDown = (e: React.KeyboardEvent, criteriaId: string) => {
@@ -124,7 +160,7 @@ export default function TeacherRubrics() {
       {projects.length > 0 && (
         <div className="bg-card border border-card-border rounded-xl p-4">
           <label className="block text-sm font-semibold text-muted-foreground mb-2">Selecione um Projeto</label>
-          <select 
+          <select
             value={selectedProjectId || ''}
             onChange={(e) => setSelectedProjectId(e.target.value)}
             className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-foreground font-medium"
@@ -154,7 +190,7 @@ export default function TeacherRubrics() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[70vh]">
             <table className="w-full">
               <thead className="bg-muted/30">
                 <tr className="text-left">
@@ -169,20 +205,24 @@ export default function TeacherRubrics() {
                   projectRubrics.map((criteria, idx) => (
                     <tr key={criteria.id} className="hover-elevate" data-testid={`row-criteria-${criteria.id}`}>
                       <td className="px-6 py-6">
-                        <input 
-                          type="text" 
-                          value={criteria.criteria} 
-                          className="font-semibold text-foreground bg-transparent border-none outline-none w-full"
+                        <input
+                          type="text"
+                          defaultValue={criteria.criteria}
+                          className="font-semibold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-primary outline-none w-full transition-colors"
                           data-testid={`input-criteria-name-${criteria.id}`}
-                          readOnly
+                          onBlur={(e) => {
+                            if (e.target.value !== criteria.criteria) {
+                              updateMutation.mutate({ id: criteria.id, criteria: e.target.value });
+                            }
+                          }}
                         />
                       </td>
                       <td className="px-6 py-6">
                         <div className="flex items-center gap-4">
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="100" 
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
                             value={editingCriteria[criteria.id]?.weight ?? criteria.weight}
                             onChange={(e) => handleWeightChange(criteria.id, parseInt(e.target.value))}
                             onMouseUp={() => handleWeightBlur(criteria.id)}
@@ -205,10 +245,10 @@ export default function TeacherRubrics() {
                         </div>
                       </td>
                       <td className="px-6 py-6">
-                        <div className="flex gap-2 overflow-x-auto hide-scroll">
+                        <div className="flex gap-2 overflow-x-auto hide-scroll max-w-[300px]">
                           {[criteria.level1, criteria.level2, criteria.level3, criteria.level4].map((level, levelIdx) => (
-                            <span 
-                              key={levelIdx} 
+                            <span
+                              key={levelIdx}
                               className="inline-block px-3 py-1 bg-muted text-muted-foreground text-xs rounded-full whitespace-nowrap border border-border"
                               data-testid={`badge-level-${criteria.id}-${levelIdx}`}
                             >
@@ -216,9 +256,25 @@ export default function TeacherRubrics() {
                             </span>
                           ))}
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 text-xs h-6"
+                          onClick={() => setEditingLevelsId(criteria.id)}
+                        >
+                          <Icon name="edit" size={12} className="mr-1" /> Editar Níveis
+                        </Button>
                       </td>
                       <td className="px-6 py-6">
-                        <button className="text-muted-foreground hover:text-destructive transition" data-testid={`button-delete-${criteria.id}`}>
+                        <button
+                          className="text-muted-foreground hover:text-destructive transition p-2 rounded-full hover:bg-destructive/10"
+                          data-testid={`button-delete-${criteria.id}`}
+                          onClick={() => {
+                            if (confirm("Tem certeza que deseja excluir este critério?")) {
+                              deleteMutation.mutate(criteria.id);
+                            }
+                          }}
+                        >
                           <Icon name="trash" size={18} />
                         </button>
                       </td>
@@ -252,7 +308,8 @@ export default function TeacherRubrics() {
             )}
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 }

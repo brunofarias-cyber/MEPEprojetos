@@ -45,6 +45,7 @@ export const projects = pgTable("projects", {
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
   delayed: boolean("delayed").notNull().default(false),
   description: text("description"),
+  stages: text("stages"), // JSON string of stages: { name, description, completed }[]
 });
 
 // Project Planning table
@@ -139,6 +140,8 @@ export const submissions = pgTable("submissions", {
   content: text("content").notNull(), // URL or file path
   comment: text("comment"),
   submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  grade: integer("grade"), // Nota final (0-100)
+  teacherFeedback: text("teacher_feedback"), // Feedback do professor
 });
 
 // Classes (Turmas)
@@ -150,13 +153,32 @@ export const classes = pgTable("classes", {
   engagement: integer("engagement").notNull().default(0), // 0-100%
 });
 
+// Student Classes (Enrollments)
+export const studentClasses = pgTable("student_classes", {
+  id: varchar("id").primaryKey(),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  enrolledAt: timestamp("enrolled_at").notNull().defaultNow(),
+});
+
 // Feedbacks (general feedback for projects/teams)
 export const feedbacks = pgTable("feedbacks", {
   id: varchar("id").primaryKey(),
   projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }), // Optional: individual feedback
   comment: text("comment").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Attendance table (Chamada)
+export const attendance = pgTable("attendance", {
+  id: varchar("id").primaryKey(),
+  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  date: text("date").notNull(), // YYYY-MM-DD
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  status: text("status").notNull(), // present, absent, late
+  notes: text("notes"),
 });
 
 // Events (reunions, deadlines for projects)
@@ -195,10 +217,12 @@ export const insertBnccCompetencySchema = createInsertSchema(bnccCompetencies).o
 export const insertProjectCompetencySchema = createInsertSchema(projectCompetencies).omit({ id: true });
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true });
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true });
+export const insertStudentClassSchema = createInsertSchema(studentClasses).omit({ id: true, enrolledAt: true });
 export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({ id: true, uploadedAt: true });
 export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
 export const insertEventResponseSchema = createInsertSchema(eventResponses).omit({ id: true, respondedAt: true });
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -240,6 +264,9 @@ export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
 export type Class = typeof classes.$inferSelect;
 export type InsertClass = z.infer<typeof insertClassSchema>;
 
+export type StudentClass = typeof studentClasses.$inferSelect;
+export type InsertStudentClass = z.infer<typeof insertStudentClassSchema>;
+
 export type BnccDocument = typeof bnccDocuments.$inferSelect;
 export type InsertBnccDocument = z.infer<typeof insertBnccDocumentSchema>;
 
@@ -251,6 +278,9 @@ export type InsertEvent = z.infer<typeof insertEventSchema>;
 
 export type EventResponse = typeof eventResponses.$inferSelect;
 export type InsertEventResponse = z.infer<typeof insertEventResponseSchema>;
+
+export type Attendance = typeof attendance.$inferSelect;
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
 
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };
@@ -310,4 +340,20 @@ export const bnccCompetenciesRelations = relations(bnccCompetencies, ({ many }) 
 export const submissionsRelations = relations(submissions, ({ one }) => ({
   project: one(projects, { fields: [submissions.projectId], references: [projects.id] }),
   student: one(students, { fields: [submissions.studentId], references: [students.id] }),
+}));
+
+export const attendanceRelations = relations(attendance, ({ one }) => ({
+  class: one(classes, { fields: [attendance.classId], references: [classes.id] }),
+  student: one(students, { fields: [attendance.studentId], references: [students.id] }),
+}));
+
+export const studentClassesRelations = relations(studentClasses, ({ one }) => ({
+  student: one(students, { fields: [studentClasses.studentId], references: [students.id] }),
+  class: one(classes, { fields: [studentClasses.classId], references: [classes.id] }),
+}));
+
+export const feedbacksRelations = relations(feedbacks, ({ one }) => ({
+  project: one(projects, { fields: [feedbacks.projectId], references: [projects.id] }),
+  teacher: one(teachers, { fields: [feedbacks.teacherId], references: [teachers.id] }),
+  student: one(students, { fields: [feedbacks.studentId], references: [students.id] }),
 }));

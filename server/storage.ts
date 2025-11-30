@@ -22,6 +22,8 @@ import type {
   EventResponse, InsertEventResponse,
   ProjectWithTeacher,
   StudentAchievementWithDetails,
+  Attendance, InsertAttendance,
+  StudentClass, InsertStudentClass,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -29,13 +31,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Coordinators
   getCoordinator(id: string): Promise<Coordinator | undefined>;
   getCoordinatorByUserId(userId: string): Promise<Coordinator | undefined>;
   getCoordinators(): Promise<Coordinator[]>;
   createCoordinator(coordinator: InsertCoordinator): Promise<Coordinator>;
-  
+
   // Teachers
   getTeacher(id: string): Promise<Teacher | undefined>;
   getTeacherByUserId(userId: string): Promise<Teacher | undefined>;
@@ -139,6 +141,19 @@ export interface IStorage {
     upcomingDeadlines: Array<{ projectId: string; title: string; deadline: string }>;
     upcomingEvents: Array<{ id: string; title: string; date: string; projectId: string | null }>;
   }>;
+
+  // New methods for Teacher Dashboard improvements
+  gradeSubmission(id: string, grade: number, feedback: string): Promise<Submission | undefined>;
+  getProjectStudents(projectId: string): Promise<any[]>;
+
+  // Attendance
+  createAttendance(attendance: InsertAttendance): Promise<Attendance>;
+  getAttendanceByClass(classId: string, date: string): Promise<Attendance[]>;
+
+  // Student Classes (Enrollments)
+  addStudentToClass(studentClass: InsertStudentClass): Promise<StudentClass>;
+  removeStudentFromClass(classId: string, studentId: string): Promise<void>;
+  getStudentsByClass(classId: string): Promise<Student[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -233,10 +248,11 @@ export class DatabaseStorage implements IStorage {
       teacherId: schema.projects.teacherId,
       delayed: schema.projects.delayed,
       description: schema.projects.description,
+      stages: schema.projects.stages,
       teacherName: schema.teachers.name,
     })
-    .from(schema.projects)
-    .leftJoin(schema.teachers, eq(schema.projects.teacherId, schema.teachers.id));
+      .from(schema.projects)
+      .leftJoin(schema.teachers, eq(schema.projects.teacherId, schema.teachers.id));
 
     return projects.map(p => ({
       ...p,
@@ -375,9 +391,9 @@ export class DatabaseStorage implements IStorage {
       achievementXp: schema.achievements.xp,
       achievementIcon: schema.achievements.icon,
     })
-    .from(schema.studentAchievements)
-    .leftJoin(schema.achievements, eq(schema.studentAchievements.achievementId, schema.achievements.id))
-    .where(eq(schema.studentAchievements.studentId, studentId));
+      .from(schema.studentAchievements)
+      .leftJoin(schema.achievements, eq(schema.studentAchievements.achievementId, schema.achievements.id))
+      .where(eq(schema.studentAchievements.studentId, studentId));
 
     return results.map(r => ({
       ...r,
@@ -460,7 +476,7 @@ export class DatabaseStorage implements IStorage {
     return await db.transaction(async (tx) => {
       // Delete old competencies
       await tx.delete(schema.projectCompetencies).where(eq(schema.projectCompetencies.projectId, projectId));
-      
+
       // Insert new competencies
       const newCompetencies: ProjectCompetency[] = [];
       for (const comp of competencies) {
@@ -470,7 +486,7 @@ export class DatabaseStorage implements IStorage {
           .returning();
         newCompetencies.push(projectCompetency);
       }
-      
+
       return newCompetencies;
     });
   }
@@ -718,6 +734,92 @@ export class DatabaseStorage implements IStorage {
       upcomingDeadlines,
       upcomingEvents,
     };
+  }
+
+  async gradeSubmission(id: string, grade: number, feedback: string): Promise<Submission | undefined> {
+    const [updated] = await db.update(schema.submissions)
+      .set({ grade, teacherFeedback: feedback })
+      .where(eq(schema.submissions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getProjectStudents(projectId: string): Promise<any[]> {
+    // Get all students
+    const allStudents = await db.select().from(schema.students);
+
+    // Get submissions for this project
+    const submissions = await db.select().from(schema.submissions).where(eq(schema.submissions.projectId, projectId));
+
+    // Map students with their submission status
+    return allStudents.map(student => {
+      const studentSubmission = submissions.find(s => s.studentId === student.id);
+      return {
+        ...student,
+        hasSubmission: !!studentSubmission,
+        submissionDate: studentSubmission?.submittedAt,
+        grade: studentSubmission?.grade,
+        status: studentSubmission ? (studentSubmission.grade ? 'Graded' : 'Submitted') : 'Pending'
+      };
+    });
+  }
+
+  // Attendance
+  async createAttendance(insertAttendance: InsertAttendance): Promise<Attendance> {
+    const id = randomUUID();
+    const [attendance] = await db.insert(schema.attendance).values({ ...insertAttendance, id }).returning();
+    return attendance;
+  }
+
+  async getAttendanceByClass(classId: string, date: string): Promise<Attendance[]> {
+    return await db.select().from(schema.attendance)
+      .where(and(
+        eq(schema.attendance.classId, classId),
+        eq(schema.attendance.date, date)
+      ));
+  }
+
+  // Student Classes (Enrollments)
+  async addStudentToClass(insertStudentClass: InsertStudentClass): Promise<StudentClass> {
+    const id = randomUUID();
+    const [studentClass] = await db.insert(schema.studentClasses).values({ ...insertStudentClass, id }).returning();
+
+    // Update student count in class
+    const [classData] = await db.select().from(schema.classes).where(eq(schema.classes.id, insertStudentClass.classId));
+    if (classData) {
+      await db.update(schema.classes)
+        .set({ studentCount: (classData.studentCount || 0) + 1 })
+        .where(eq(schema.classes.id, insertStudentClass.classId));
+    }
+
+    return studentClass;
+  }
+
+  async removeStudentFromClass(classId: string, studentId: string): Promise<void> {
+    await db.delete(schema.studentClasses)
+      .where(and(
+        eq(schema.studentClasses.classId, classId),
+        eq(schema.studentClasses.studentId, studentId)
+      ));
+
+    // Update student count in class
+    const [classData] = await db.select().from(schema.classes).where(eq(schema.classes.id, classId));
+    if (classData && classData.studentCount > 0) {
+      await db.update(schema.classes)
+        .set({ studentCount: classData.studentCount - 1 })
+        .where(eq(schema.classes.id, classId));
+    }
+  }
+
+  async getStudentsByClass(classId: string): Promise<Student[]> {
+    const results = await db.select({
+      student: schema.students
+    })
+      .from(schema.studentClasses)
+      .innerJoin(schema.students, eq(schema.studentClasses.studentId, schema.students.id))
+      .where(eq(schema.studentClasses.classId, classId));
+
+    return results.map(r => r.student);
   }
 }
 

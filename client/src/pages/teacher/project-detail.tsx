@@ -16,6 +16,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Icon } from "@/components/Icon";
 import type { ProjectWithTeacher, RubricCriteria, ProjectPlanning, BnccCompetency, ProjectCompetency } from "@shared/schema";
 import { ArrowLeft, Sparkles, Check, X, Loader2 } from "lucide-react";
+import { StudentsTab } from "./tabs/students-tab";
+import { GradingTab } from "./tabs/grading-tab";
 
 const planningFormSchema = z.object({
   objectives: z.string().optional(),
@@ -187,7 +189,7 @@ export default function ProjectDetail() {
   };
 
   const toggleSuggestion = (index: number) => {
-    setAiSuggestions(prev => 
+    setAiSuggestions(prev =>
       prev.map((s, i) => i === index ? { ...s, selected: !s.selected } : s)
     );
   };
@@ -199,7 +201,7 @@ export default function ProjectDetail() {
         competencyId: s.competency.id,
         coverage: s.coverage,
       }));
-    
+
     if (selected.length === 0) {
       toast({
         title: "Nenhuma competência selecionada",
@@ -208,7 +210,7 @@ export default function ProjectDetail() {
       });
       return;
     }
-    
+
     saveCompetenciesMutation.mutate(selected);
   };
 
@@ -233,12 +235,62 @@ export default function ProjectDetail() {
     }
   };
 
-  const stages = [
-    { name: "Pesquisa", description: "Investigação e coleta de informações", completed: project.progress >= 25 },
-    { name: "Prototipagem", description: "Desenvolvimento de protótipos e ideias", completed: project.progress >= 50 },
-    { name: "Implementação", description: "Execução do projeto", completed: project.progress >= 75 },
-    { name: "Apresentação", description: "Entrega e demonstração final", completed: project.progress >= 100 },
+  const [showStagesModal, setShowStagesModal] = useState(false);
+
+  const defaultStages = [
+    { name: "Pesquisa", description: "Investigação e coleta de informações", completed: false },
+    { name: "Prototipagem", description: "Desenvolvimento de protótipos e ideias", completed: false },
+    { name: "Implementação", description: "Execução do projeto", completed: false },
+    { name: "Apresentação", description: "Entrega e demonstração final", completed: false },
   ];
+
+  const [currentStages, setCurrentStages] = useState<any[]>(defaultStages);
+  const [editingStages, setEditingStages] = useState<any[]>(defaultStages);
+
+  useEffect(() => {
+    if (project?.stages) {
+      try {
+        const parsed = JSON.parse(project.stages);
+        setCurrentStages(parsed);
+        setEditingStages(parsed);
+      } catch (e) {
+        console.error("Failed to parse stages", e);
+      }
+    } else if (project) {
+      // If no stages saved, calculate default completion based on progress
+      const calculatedStages = defaultStages.map((s, i) => ({
+        ...s,
+        completed: project.progress >= (i + 1) * 25
+      }));
+      setCurrentStages(calculatedStages);
+      setEditingStages(calculatedStages);
+    }
+  }, [project]);
+
+  const saveStagesMutation = useMutation({
+    mutationFn: async (stages: any[]) => {
+      if (!id) throw new Error('Project ID is required');
+      return apiRequest(`/api/projects/${id}`, {
+        method: 'PATCH',
+        body: { stages: JSON.stringify(stages) },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', id] });
+      setShowStagesModal(false);
+      toast({
+        title: "Etapas atualizadas",
+        description: "As etapas do projeto foram salvas com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar as etapas.",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="animate-fade-in space-y-6 pb-8">
@@ -267,9 +319,11 @@ export default function ProjectDetail() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3" data-testid="tabs-list">
+        <TabsList className="grid w-full grid-cols-5" data-testid="tabs-list">
           <TabsTrigger value="overview" data-testid="tab-overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="planning" data-testid="tab-planning">Planejamento</TabsTrigger>
+          <TabsTrigger value="students" data-testid="tab-students">Alunos</TabsTrigger>
+          <TabsTrigger value="grading" data-testid="tab-grading">Correção</TabsTrigger>
           <TabsTrigger value="rubrics" data-testid="tab-rubrics">Avaliação</TabsTrigger>
         </TabsList>
 
@@ -287,7 +341,7 @@ export default function ProjectDetail() {
                   <span className="text-sm font-bold text-primary" data-testid="text-progress">{project.progress}%</span>
                 </div>
                 <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-primary rounded-full transition-all duration-500"
                     style={{ width: `${project.progress}%` }}
                     data-testid="progress-bar"
@@ -315,27 +369,31 @@ export default function ProjectDetail() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Etapas do Projeto</CardTitle>
-              <CardDescription>Marcos importantes do desenvolvimento</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="space-y-1">
+                <CardTitle>Etapas do Projeto</CardTitle>
+                <CardDescription>Marcos importantes do desenvolvimento</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setShowStagesModal(true)}>
+                <Icon name="edit" size={14} className="mr-2" />
+                Gerenciar Etapas
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {stages.map((stage, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`flex items-start gap-3 p-4 rounded-lg border ${
-                      stage.completed 
-                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
-                        : "bg-muted/50 border-border"
-                    }`}
+              <div className="space-y-3 mt-4">
+                {currentStages.map((stage, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-3 p-4 rounded-lg border ${stage.completed
+                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                      : "bg-muted/50 border-border"
+                      }`}
                     data-testid={`stage-${idx}`}
                   >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      stage.completed 
-                        ? "bg-green-500 text-white" 
-                        : "bg-muted text-muted-foreground"
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${stage.completed
+                      ? "bg-green-500 text-white"
+                      : "bg-muted text-muted-foreground"
+                      }`}>
                       {stage.completed ? (
                         <Icon name="check" size={18} />
                       ) : (
@@ -351,6 +409,7 @@ export default function ProjectDetail() {
               </div>
             </CardContent>
           </Card>
+
         </TabsContent>
 
         {/* Planning Tab */}
@@ -504,7 +563,7 @@ export default function ProjectDetail() {
               <CardContent>
                 <div className="space-y-3">
                   {projectCompetencies.map((pc) => (
-                    <div 
+                    <div
                       key={pc.id}
                       className="p-4 border border-border rounded-lg bg-muted/30"
                       data-testid={`competency-${pc.id}`}
@@ -536,6 +595,16 @@ export default function ProjectDetail() {
           )}
         </TabsContent>
 
+        {/* Students Tab */}
+        <TabsContent value="students" className="space-y-6" data-testid="content-students">
+          {id && <StudentsTab projectId={id} />}
+        </TabsContent>
+
+        {/* Grading Tab */}
+        <TabsContent value="grading" className="space-y-6" data-testid="content-grading">
+          {id && <GradingTab projectId={id} />}
+        </TabsContent>
+
         {/* Rubrics Tab */}
         <TabsContent value="rubrics" className="space-y-6" data-testid="content-rubrics">
           <Card>
@@ -549,8 +618,8 @@ export default function ProjectDetail() {
               {rubrics.length > 0 ? (
                 <div className="space-y-2">
                   {rubrics.map((rubric) => (
-                    <div 
-                      key={rubric.id} 
+                    <div
+                      key={rubric.id}
                       className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border"
                       data-testid={`rubric-${rubric.id}`}
                     >
@@ -570,6 +639,99 @@ export default function ProjectDetail() {
         </TabsContent>
       </Tabs>
 
+      {/* Stages Management Modal */}
+      <Dialog open={showStagesModal} onOpenChange={setShowStagesModal}>
+        <DialogContent className="max-w-2xl" data-testid="modal-stages">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Etapas do Projeto</DialogTitle>
+            <DialogDescription>
+              Adicione, edite ou remova as etapas do projeto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            {editingStages.map((stage, index) => (
+              <div key={index} className="flex gap-3 items-start p-3 border rounded-lg bg-muted/20">
+                <div className="flex-1 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="w-8 h-8 flex items-center justify-center bg-muted rounded-full text-sm font-bold flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <input
+                      className="flex-1 bg-transparent border border-border rounded px-2 py-1 text-sm font-medium"
+                      value={stage.name}
+                      onChange={(e) => {
+                        const newStages = [...editingStages];
+                        newStages[index].name = e.target.value;
+                        setEditingStages(newStages);
+                      }}
+                      placeholder="Nome da etapa"
+                    />
+                  </div>
+                  <textarea
+                    className="w-full bg-transparent border border-border rounded px-2 py-1 text-sm resize-none"
+                    rows={2}
+                    value={stage.description}
+                    onChange={(e) => {
+                      const newStages = [...editingStages];
+                      newStages[index].description = e.target.value;
+                      setEditingStages(newStages);
+                    }}
+                    placeholder="Descrição da etapa"
+                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`completed-${index}`}
+                      checked={stage.completed}
+                      onChange={(e) => {
+                        const newStages = [...editingStages];
+                        newStages[index].completed = e.target.checked;
+                        setEditingStages(newStages);
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <label htmlFor={`completed-${index}`} className="text-sm text-muted-foreground cursor-pointer">
+                      Marcar como concluída
+                    </label>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    const newStages = editingStages.filter((_, i) => i !== index);
+                    setEditingStages(newStages);
+                  }}
+                >
+                  <Icon name="trash" size={18} />
+                </Button>
+              </div>
+            ))}
+
+            <Button
+              variant="outline"
+              className="w-full border-dashed"
+              onClick={() => setEditingStages([...editingStages, { name: "", description: "", completed: false }])}
+            >
+              <Icon name="plus" size={14} className="mr-2" />
+              Adicionar Etapa
+            </Button>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-4">
+            <Button variant="outline" onClick={() => setShowStagesModal(false)}>Cancelar</Button>
+            <Button
+              onClick={() => saveStagesMutation.mutate(editingStages)}
+              disabled={saveStagesMutation.isPending}
+            >
+              {saveStagesMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* AI Analysis Modal */}
       <Dialog open={showAiModal} onOpenChange={setShowAiModal}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="modal-ai-analysis">
@@ -579,7 +741,7 @@ export default function ProjectDetail() {
               Sugestões de Competências BNCC
             </DialogTitle>
             <DialogDescription>
-              A IA analisou o planejamento do projeto e sugeriu as seguintes competências. 
+              A IA analisou o planejamento do projeto e sugeriu as seguintes competências.
               Selecione as que deseja vincular ao projeto.
             </DialogDescription>
           </DialogHeader>
@@ -593,11 +755,10 @@ export default function ProjectDetail() {
               aiSuggestions.map((suggestion, index) => (
                 <div
                   key={index}
-                  className={`p-4 border rounded-lg transition-all ${
-                    suggestion.selected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-muted/20'
-                  }`}
+                  className={`p-4 border rounded-lg transition-all ${suggestion.selected
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-muted/20'
+                    }`}
                   data-testid={`suggestion-${index}`}
                 >
                   <div className="flex items-start gap-3">
@@ -606,11 +767,10 @@ export default function ProjectDetail() {
                       variant="ghost"
                       size="icon"
                       onClick={() => toggleSuggestion(index)}
-                      className={`mt-1 flex-shrink-0 ${
-                        suggestion.selected
-                          ? 'text-primary hover:text-primary'
-                          : 'text-muted-foreground'
-                      }`}
+                      className={`mt-1 flex-shrink-0 ${suggestion.selected
+                        ? 'text-primary hover:text-primary'
+                        : 'text-muted-foreground'
+                        }`}
                       data-testid={`button-toggle-${index}`}
                     >
                       {suggestion.selected ? (
@@ -619,7 +779,7 @@ export default function ProjectDetail() {
                         <X className="w-5 h-5" />
                       )}
                     </Button>
-                    
+
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold text-foreground">
@@ -632,13 +792,13 @@ export default function ProjectDetail() {
                           {suggestion.coverage}% cobertura
                         </Badge>
                       </div>
-                      
+
                       {suggestion.competency.description && (
                         <p className="text-sm text-muted-foreground mb-2">
                           {suggestion.competency.description}
                         </p>
                       )}
-                      
+
                       <div className="mt-3 p-3 bg-background rounded-md border border-border">
                         <p className="text-xs font-medium text-muted-foreground mb-1">
                           Justificativa da IA:
@@ -682,6 +842,6 @@ export default function ProjectDetail() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
