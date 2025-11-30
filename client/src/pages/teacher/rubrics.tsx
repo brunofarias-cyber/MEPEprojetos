@@ -86,6 +86,38 @@ export default function TeacherRubrics() {
     },
   });
 
+  const createCriteriaMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedProjectId) throw new Error('Selecione um projeto');
+      return await apiRequest('/api/rubrics', {
+        method: 'POST',
+        body: {
+          projectId: selectedProjectId,
+          criteria: 'Novo Critério',
+          weight: 10,
+          level1: 'Insuficiente',
+          level2: 'Regular',
+          level3: 'Bom',
+          level4: 'Excelente',
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/rubrics/${selectedProjectId}`] });
+      toast({
+        title: "Critério adicionado",
+        description: "Novo critério criado com sucesso. Você pode editá-lo agora.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao criar critério",
+        description: error.message || "Não foi possível adicionar o critério.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCriteriaChange = (id: string, newCriteria: string) => {
     // Debounce or save on blur could be better, but for now let's save on blur
     // We'll just update local state if we had one, but we are using the input directly.
@@ -185,9 +217,17 @@ export default function TeacherRubrics() {
             <h3 className="font-bold text-lg text-foreground">
               {selectedProject ? `Projeto: ${selectedProject.title}` : 'Nenhum projeto selecionado'}
             </h3>
-            <button className="text-sm text-primary font-semibold hover-elevate px-3 py-1.5 rounded-lg flex items-center gap-1" data-testid="button-add-criteria">
-              <Icon name="plus" size={16} /> Adicionar Critério
-            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-sm text-primary font-semibold hover-elevate flex items-center gap-1"
+              data-testid="button-add-criteria"
+              onClick={() => createCriteriaMutation.mutate()}
+              disabled={!selectedProjectId || createCriteriaMutation.isPending}
+            >
+              <Icon name="plus" size={16} />
+              {createCriteriaMutation.isPending ? "Adicionando..." : "Adicionar Critério"}
+            </Button>
           </div>
 
           <div className="overflow-auto max-h-[70vh]">

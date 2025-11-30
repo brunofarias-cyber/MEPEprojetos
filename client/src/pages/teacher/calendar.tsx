@@ -405,7 +405,16 @@ export default function TeacherCalendar() {
               const isDeadline = (event as any).type === 'deadline';
 
               return (
-                <Card key={event.id} className={`hover-elevate ${isDeadline ? 'border-l-4 border-l-orange-500 bg-orange-50/30' : ''}`} data-testid={`card-event-${event.id}`}>
+                <Card
+                  key={event.id}
+                  className={`hover-elevate transition-all ${isDeadline ? 'border-l-4 border-l-orange-500 bg-orange-50/30' : 'cursor-pointer hover:shadow-lg'}`}
+                  data-testid={`card-event-${event.id}`}
+                  onClick={() => {
+                    if (!isDeadline) {
+                      startEdit(event as Event);
+                    }
+                  }}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
