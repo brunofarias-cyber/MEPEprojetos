@@ -26,6 +26,11 @@ import {
   insertEventSchema,
   insertAttendanceSchema,
   insertStudentClassSchema,
+  insertTeamSchema,
+  insertBnccDocumentSchema,
+  insertEvaluationSchema,
+  insertEvaluationScoreSchema,
+  insertPortfolioItemSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -764,6 +769,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertSubmissionSchema.parse(req.body);
       const submission = await storage.createSubmission(data);
+
+      // Track achievements
+      if (submission.studentId) {
+        // First submission achievement
+        await storage.trackAchievementProgress(submission.studentId, 'ach-primeira-entrega', 1, 1);
+
+        // Master of projects (complete 10 projects)
+        await storage.trackAchievementProgress(submission.studentId, 'ach-mestre-projetos', 1, 10);
+      }
+
       res.status(201).json(submission);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -778,14 +793,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { grade, feedback } = req.body;
-      if (grade === undefined || grade < 0 || grade > 100) {
-        return res.status(400).json({ error: "Nota inválida (deve ser entre 0 e 100)" });
+      const submission = await storage.gradeSubmission(req.params.id, grade, feedback);
+
+      if (!submission) {
+        return res.status(404).json({ error: "Submission not found" });
       }
 
-      const submission = await storage.gradeSubmission(req.params.id, grade, feedback);
-      if (!submission) return res.status(404).json({ error: "Submissão não encontrada" });
+      const achievementsUnlocked: string[] = [];
 
-      res.json(submission);
+      // Track grade-based achievements
+      if (submission.studentId && grade !== null && grade !== undefined) {
+        // Perfect score (100)
+        if (grade === 100) {
+          const result = await storage.trackAchievementProgress(submission.studentId, 'ach-perfeccionista', 1, 1);
+          if (result.unlocked) achievementsUnlocked.push('Perfeccionista');
+        }
+
+        // Excellence (grade above 90, 5 times)
+        if (grade >= 90) {
+          const result = await storage.trackAchievementProgress(submission.studentId, 'ach-excelencia', 1, 5);
+          if (result.unlocked) achievementsUnlocked.push('Excelência');
+        }
+
+        // Good student (average above 80, 3 consecutive projects)
+        if (grade >= 80) {
+          const result = await storage.trackAchievementProgress(submission.studentId, 'ach-bom-aluno', 1, 3);
+          if (result.unlocked) achievementsUnlocked.push('Bom Aluno');
+        }
+      }
+
+      res.json({
+        submission,
+        achievementsUnlocked: achievementsUnlocked.length > 0 ? achievementsUnlocked : undefined
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -854,32 +894,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Feedbacks (Updated to include studentId)
-  app.post("/api/feedbacks", async (req, res) => {
+  // ===== TEAMS =====
+  app.get("/api/projects/:projectId/teams", async (req, res) => {
     try {
-      const data = insertFeedbackSchema.parse(req.body);
-      const feedback = await storage.createFeedback(data);
-      res.status(201).json(feedback);
+      const teams = await storage.getTeamsByProject(req.params.projectId);
+      res.json(teams);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/teams", async (req, res) => {
+    try {
+      const data = insertTeamSchema.parse(req.body);
+      const team = await storage.createTeam(data);
+      res.status(201).json(team);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.patch("/api/feedbacks/:id", async (req, res) => {
+  app.patch("/api/teams/:id", async (req, res) => {
     try {
-      const { comment } = req.body;
-      const feedback = await storage.updateFeedback(req.params.id, comment);
-      if (!feedback) return res.status(404).json({ error: "Feedback not found" });
-      res.json(feedback);
+      const data = insertTeamSchema.partial().parse(req.body);
+      const team = await storage.updateTeam(req.params.id, data);
+      if (!team) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.json(team);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.delete("/api/feedbacks/:id", async (req, res) => {
-    const deleted = await storage.deleteFeedback(req.params.id);
-    if (!deleted) return res.status(404).json({ error: "Feedback not found" });
-    res.status(204).send();
+  app.delete("/api/teams/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteTeam(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Team Members
+  app.get("/api/teams/:teamId/members", async (req, res) => {
+    try {
+      const members = await storage.getTeamMembers(req.params.teamId);
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/teams/:teamId/members", async (req, res) => {
+    try {
+      const { studentId, role } = req.body;
+      const member = await storage.addStudentToTeam(req.params.teamId, studentId, role);
+      res.status(201).json(member);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/teams/:teamId/members/:studentId", async (req, res) => {
+    try {
+      const deleted = await storage.removeStudentFromTeam(req.params.teamId, req.params.studentId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===== EVALUATIONS =====
+  app.get("/api/projects/:projectId/evaluations", async (req, res) => {
+    try {
+      const evaluations = await storage.getEvaluationsByProject(req.params.projectId);
+      res.json(evaluations);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/evaluations", async (req, res) => {
+    try {
+      const { scores, ...evaluationData } = req.body;
+
+      // Create evaluation
+      const data = insertEvaluationSchema.parse(evaluationData);
+      const evaluation = await storage.createEvaluation(data);
+
+      // Save scores if provided
+      if (scores && Array.isArray(scores)) {
+        await storage.saveEvaluationScores(evaluation.id, scores);
+      }
+
+      res.status(201).json(evaluation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/evaluations/:id", async (req, res) => {
+    try {
+      const evaluation = await storage.getEvaluationsByProject(req.params.id);
+      if (!evaluation) {
+        return res.status(404).json({ error: "Evaluation not found" });
+      }
+
+      // Include scores
+      const scores = await storage.getEvaluationScores(req.params.id);
+      res.json({ ...evaluation, scores });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/evaluations/:id", async (req, res) => {
+    try {
+      const { scores, ...updateData } = req.body;
+
+      // Update evaluation
+      const data = insertEvaluationSchema.partial().parse(updateData);
+      const evaluation = await storage.updateEvaluation(req.params.id, data);
+
+      if (!evaluation) {
+        return res.status(404).json({ error: "Evaluation not found" });
+      }
+
+      // Update scores if provided
+      if (scores && Array.isArray(scores)) {
+        await storage.saveEvaluationScores(req.params.id, scores);
+      }
+
+      res.json(evaluation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/evaluations/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEvaluation(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Evaluation not found" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   app.get("/api/feedbacks/project/:projectId", async (req, res) => {
@@ -906,6 +1074,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(classData);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Get students by class
+  app.get("/api/classes/:classId/students", async (req, res) => {
+    try {
+      const students = await storage.getStudentsByClass(req.params.classId);
+      res.json(students);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -1129,6 +1307,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(competencies);
   });
 
+  // Portfolio Routes
+
+  // Get student portfolio (Public)
+  app.get("/api/students/:id/portfolio", async (req, res) => {
+    const studentId = req.params.id;
+    const student = await storage.getStudent(studentId);
+
+    if (!student) {
+      return res.status(404).json({ error: "Estudante não encontrado" });
+    }
+
+    if (!student.portfolioVisible) {
+      // If user is the student themselves or a teacher/coordinator, allow access
+      const canAccess = req.user && (
+        req.user.id === student.userId ||
+        req.user.role === 'teacher' ||
+        req.user.role === 'coordinator'
+      );
+
+      if (!canAccess) {
+        return res.status(403).json({ error: "Este portfolio é privado" });
+      }
+    }
+
+    const items = await storage.getPortfolioItems(studentId);
+    res.json({
+      student: {
+        name: student.name,
+        avatar: student.avatar,
+        bio: student.portfolioBio,
+        slug: student.portfolioSlug,
+      },
+      items
+    });
+  });
+
+  // Get portfolio by slug (Public)
+  app.get("/api/portfolio/:slug", async (req, res) => {
+    const slug = req.params.slug;
+    const student = await storage.getStudentByPortfolioSlug(slug);
+
+    if (!student) {
+      return res.status(404).json({ error: "Portfolio não encontrado" });
+    }
+
+    if (!student.portfolioVisible) {
+      return res.status(403).json({ error: "Este portfolio é privado" });
+    }
+
+    const items = await storage.getPortfolioItems(student.id);
+    res.json({
+      student: {
+        name: student.name,
+        avatar: student.avatar,
+        bio: student.portfolioBio,
+        slug: student.portfolioSlug,
+      },
+      items
+    });
+  });
+
+  // Add item to portfolio (Student only)
+  app.post("/api/portfolio/items", async (req, res) => {
+    if (!req.user || req.user.role !== 'student') {
+      return res.status(403).json({ error: "Apenas estudantes podem gerenciar seu portfolio" });
+    }
+
+    const student = await storage.getStudentByUserId(req.user.id);
+    if (!student) return res.status(404).json({ error: "Estudante não encontrado" });
+
+    const schema = insertPortfolioItemSchema.extend({
+      studentId: z.string().optional(), // We'll set this from session
+    });
+
+    const parseResult = schema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json(parseResult.error);
+    }
+
+    // Verify submission belongs to student
+    const submissions = await storage.getSubmissionsByStudent(student.id);
+    const submission = submissions.find(s => s.id === parseResult.data.submissionId);
+
+    if (!submission) {
+      return res.status(403).json({ error: "Submissão inválida ou não pertence ao aluno" });
+    }
+
+    const item = await storage.addToPortfolio({
+      ...parseResult.data,
+      studentId: student.id,
+    });
+
+    res.status(201).json(item);
+  });
+
+  // Remove item from portfolio (Student only)
+  app.delete("/api/portfolio/items/:id", async (req, res) => {
+    if (!req.user || req.user.role !== 'student') {
+      return res.status(403).json({ error: "Apenas estudantes podem gerenciar seu portfolio" });
+    }
+
+    const student = await storage.getStudentByUserId(req.user.id);
+    if (!student) return res.status(404).json({ error: "Estudante não encontrado" });
+
+    const items = await storage.getPortfolioItems(student.id);
+    const item = items.find(i => i.id === req.params.id);
+
+    if (!item) {
+      return res.status(404).json({ error: "Item não encontrado no portfolio" });
+    }
+
+    await storage.removeFromPortfolio(req.params.id);
+    res.sendStatus(204);
+  });
+
+  // Update portfolio settings (Student only)
+  app.patch("/api/students/:id/portfolio-settings", async (req, res) => {
+    if (!req.user || req.user.role !== 'student') {
+      return res.status(403).json({ error: "Apenas estudantes podem gerenciar seu portfolio" });
+    }
+
+    const student = await storage.getStudentByUserId(req.user.id);
+    if (!student || student.id !== req.params.id) {
+      return res.status(403).json({ error: "Não autorizado" });
+    }
+
+    const updatedStudent = await storage.updateStudent(student.id, {
+      portfolioSlug: req.body.slug,
+      portfolioVisible: req.body.visible,
+      portfolioBio: req.body.bio,
+    });
+
+    res.json(updatedStudent);
+  });
+
+  // Get student submissions (Protected)
+  app.get("/api/students/:id/submissions", async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Não autenticado" });
+
+    // Allow student to see own submissions, or teacher/coordinator
+    if (req.user.role === 'student' && req.user.id !== req.params.id) {
+      // Check if user.id matches the student's user_id. 
+      // req.params.id is student.id (uuid), req.user.id is user.id (uuid)
+      // We need to get student first to check ownership
+      const student = await storage.getStudent(req.params.id);
+      if (!student || student.userId !== req.user.id) {
+        return res.status(403).json({ error: "Não autorizado" });
+      }
+    }
+
+    const submissions = await storage.getSubmissionsByStudent(req.params.id);
+
+    // Enrich with project details
+    const submissionsWithProject = await Promise.all(submissions.map(async (sub) => {
+      const project = await storage.getProject(sub.projectId);
+      return { ...sub, project };
+    }));
+
+    res.json(submissionsWithProject);
+  });
+
+  // Analytics Routes (Coordinator only)
+  app.get("/api/analytics/overview", async (req, res) => {
+    if (!req.user || req.user.role !== 'coordinator') {
+      return res.status(403).json({ error: "Acesso restrito a coordenadores" });
+    }
+    const data = await storage.getAnalyticsOverview();
+    res.json(data);
+  });
+
+  app.get("/api/analytics/engagement", async (req, res) => {
+    if (!req.user || req.user.role !== 'coordinator') {
+      return res.status(403).json({ error: "Acesso restrito a coordenadores" });
+    }
+    const data = await storage.getEngagementMetrics();
+    res.json(data);
+  });
+
+  app.get("/api/analytics/bncc", async (req, res) => {
+    if (!req.user || req.user.role !== 'coordinator') {
+      return res.status(403).json({ error: "Acesso restrito a coordenadores" });
+    }
+    const data = await storage.getBnccUsage();
+    res.json(data);
+  });
+
+  app.get("/api/analytics/at-risk-students", async (req, res) => {
+    if (!req.user || req.user.role !== 'coordinator') {
+      return res.status(403).json({ error: "Acesso restrito a coordenadores" });
+    }
+    const data = await storage.getAtRiskStudents();
+    res.json(data);
+  });
+
   // BNCC Document Routes (Coordinator-only)
   app.get("/api/bncc-documents", async (req, res) => {
     // Validate authentication
@@ -1330,6 +1702,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = insertEventSchema.parse(req.body);
       const event = await storage.createEvent(data);
+
+      // FIX: Automatically create event responses for students in the project
+      if (event.projectId) {
+        // 1. Get students from submissions
+        const submissions = await storage.getSubmissionsByProject(event.projectId);
+        const submissionStudentIds = submissions.map(s => s.studentId);
+
+        // 2. Get students from teams
+        const teams = await storage.getTeamsByProject(event.projectId);
+        let teamStudentIds: string[] = [];
+        for (const team of teams) {
+          const members = await storage.getTeamMembers(team.id);
+          teamStudentIds = [...teamStudentIds, ...members.map(m => m.id)];
+        }
+
+        // 3. Unique students
+        const uniqueStudentIds = Array.from(new Set([...submissionStudentIds, ...teamStudentIds]));
+
+        // 4. Create responses
+        for (const studentId of uniqueStudentIds) {
+          await storage.createEventResponse({
+            eventId: event.id,
+            studentId: studentId,
+            status: 'pending',
+          });
+        }
+      }
+
       res.status(201).json(event);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -1369,6 +1769,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Notification endpoint
+  app.post("/api/events/:id/notify", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'teacher') {
+        return res.status(403).json({ error: "Apenas professores podem enviar notificações" });
+      }
+
+      const event = await storage.getEvent(req.params.id);
+      if (!event) return res.status(404).json({ error: "Evento não encontrado" });
+
+      // Get students to notify
+      let studentIds: string[] = [];
+
+      if (event.projectId) {
+        const submissions = await storage.getSubmissionsByProject(event.projectId);
+        const teams = await storage.getTeamsByProject(event.projectId);
+
+        const submissionStudentIds = submissions.map(s => s.studentId);
+        let teamStudentIds: string[] = [];
+        for (const team of teams) {
+          const members = await storage.getTeamMembers(team.id);
+          teamStudentIds = [...teamStudentIds, ...members.map(m => m.id)];
+        }
+
+        studentIds = Array.from(new Set([...submissionStudentIds, ...teamStudentIds]));
+      }
+
+      // Mock notification sending
+      console.log(`Sending notifications to ${studentIds.length} students for event ${event.title}`);
+
+      res.json({
+        success: true,
+        notifiedCount: studentIds.length,
+        message: "Notificações enviadas com sucesso"
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Events for students (with responses)
   app.get("/api/events/student/:studentId", async (req, res) => {
     try {
@@ -1378,16 +1818,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const studentId = req.params.studentId;
 
-      // Get all projects the student has submitted to
-      const allProjects = await storage.getProjects();
+      // FIX: Filter events relevant to the student
 
-      // For now, get all events and let frontend filter by project
-      // This is simpler than querying submissions
+      // 1. Get student's projects (from submissions and teams)
+      const submissions = await storage.getSubmissionsByStudent(studentId);
+      const teams = await storage.getTeamsByStudent(studentId);
+
+      const studentProjectIds = new Set([
+        ...submissions.map(s => s.projectId),
+        ...teams.map(t => t.projectId)
+      ]);
+
+      // 2. Get all events
       const allEvents = await storage.getEvents();
+
+      // 3. Filter events
+      const relevantEvents = allEvents.filter(event => {
+        // Include if event is for one of the student's projects
+        if (event.projectId && studentProjectIds.has(event.projectId)) {
+          return true;
+        }
+
+        // Include if event has no project (general) - could be refined to check teacher
+        if (!event.projectId) {
+          return true;
+        }
+
+        return false;
+      });
 
       const eventsWithResponses = [];
 
-      for (const event of allEvents) {
+      for (const event of relevantEvents) {
         const response = await storage.getEventResponse(event.id, studentId);
         eventsWithResponses.push({
           ...event,

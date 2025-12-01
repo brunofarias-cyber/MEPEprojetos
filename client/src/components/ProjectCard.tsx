@@ -44,7 +44,7 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false, showD
       </div>
 
       <div className={`h-2 bg-muted rounded-full overflow-hidden mb-4`}>
-        <div 
+        <div
           className={`h-full bg-gradient-to-r ${getThemeColors(project.theme)} rounded-full transition-all duration-1000`}
           style={{ width: `${project.progress}%` }}
           data-testid={`progress-bar-${project.id}`}
@@ -58,7 +58,9 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false, showD
         </div>
         <div className="flex items-center gap-2">
           <Icon name="calendar" size={16} className="text-muted-foreground" />
-          <span className="text-muted-foreground" data-testid={`text-deadline-${project.id}`}>{new Date(project.nextDeadline || '').toLocaleDateString('pt-BR')}</span>
+          <span className="text-muted-foreground" data-testid={`text-deadline-${project.id}`}>
+            {project.nextDeadline ? new Date(project.nextDeadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+          </span>
         </div>
       </div>
 
@@ -85,7 +87,7 @@ export function ProjectCard({ project, onSubmit, showSubmitButton = false, showD
       )}
 
       {showSubmitButton && onSubmit && (
-        <button 
+        <button
           onClick={onSubmit}
           data-testid={`button-submit-${project.id}`}
           className="w-full bg-primary text-primary-foreground px-4 py-3 rounded-lg font-semibold hover:bg-primary/90 transition flex items-center justify-center gap-2 shadow-md"

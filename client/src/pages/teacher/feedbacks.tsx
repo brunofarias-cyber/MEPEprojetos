@@ -80,10 +80,11 @@ export default function TeacherFeedback() {
         description: "O feedback foi registrado com sucesso.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Erro ao criar feedback:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível adicionar o feedback.",
+        description: error.message || "Não foi possível adicionar o feedback.",
         variant: "destructive",
       });
     },
@@ -149,7 +150,7 @@ export default function TeacherFeedback() {
     createMutation.mutate({
       teacherId: teacher.id,
       projectId: data.projectId,
-      studentId: data.studentId === "all" ? null : data.studentId,
+      studentId: data.studentId === "all" ? undefined : data.studentId,
       comment: data.comment,
     });
   };

@@ -18,6 +18,9 @@ import type { ProjectWithTeacher, RubricCriteria, ProjectPlanning, BnccCompetenc
 import { ArrowLeft, Sparkles, Check, X, Loader2 } from "lucide-react";
 import { StudentsTab } from "./tabs/students-tab";
 import { GradingTab } from "./tabs/grading-tab";
+import { FeedbackTab } from "./tabs/feedback-tab";
+import { RubricGradingTab } from "./tabs/rubric-grading-tab";
+import { EvaluationTab } from "./tabs/evaluation-tab";
 
 const planningFormSchema = z.object({
   objectives: z.string().optional(),
@@ -40,6 +43,19 @@ export default function ProjectDetail() {
   const { toast } = useToast();
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
+
+  // Move all useState hooks BEFORE any conditional returns
+  const [showStagesModal, setShowStagesModal] = useState(false);
+
+  const defaultStages = [
+    { name: "Pesquisa", description: "Investigação e coleta de informações", completed: false },
+    { name: "Prototipagem", description: "Desenvolvimento de protótipos e ideias", completed: false },
+    { name: "Implementação", description: "Execução do projeto", completed: false },
+    { name: "Apresentação", description: "Entrega e demonstração final", completed: false },
+  ];
+
+  const [currentStages, setCurrentStages] = useState<any[]>(defaultStages);
+  const [editingStages, setEditingStages] = useState<any[]>(defaultStages);
 
   const { data: project, isLoading: projectLoading } = useQuery<ProjectWithTeacher>({
     queryKey: ['/api/projects', id],
@@ -235,18 +251,6 @@ export default function ProjectDetail() {
     }
   };
 
-  const [showStagesModal, setShowStagesModal] = useState(false);
-
-  const defaultStages = [
-    { name: "Pesquisa", description: "Investigação e coleta de informações", completed: false },
-    { name: "Prototipagem", description: "Desenvolvimento de protótipos e ideias", completed: false },
-    { name: "Implementação", description: "Execução do projeto", completed: false },
-    { name: "Apresentação", description: "Entrega e demonstração final", completed: false },
-  ];
-
-  const [currentStages, setCurrentStages] = useState<any[]>(defaultStages);
-  const [editingStages, setEditingStages] = useState<any[]>(defaultStages);
-
   useEffect(() => {
     if (project?.stages) {
       try {
@@ -319,12 +323,15 @@ export default function ProjectDetail() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5" data-testid="tabs-list">
+        <TabsList className="grid w-full grid-cols-8" data-testid="tabs-list">
           <TabsTrigger value="overview" data-testid="tab-overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="planning" data-testid="tab-planning">Planejamento</TabsTrigger>
           <TabsTrigger value="students" data-testid="tab-students">Alunos</TabsTrigger>
           <TabsTrigger value="grading" data-testid="tab-grading">Correção</TabsTrigger>
-          <TabsTrigger value="rubrics" data-testid="tab-rubrics">Avaliação</TabsTrigger>
+          <TabsTrigger value="feedback" data-testid="tab-feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="rubric-grading" data-testid="tab-rubric-grading">Rubrica (Níveis)</TabsTrigger>
+          <TabsTrigger value="evaluation" data-testid="tab-evaluation">Avaliação (Notas)</TabsTrigger>
+          <TabsTrigger value="rubrics" data-testid="tab-rubrics">Rubricas</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -605,6 +612,16 @@ export default function ProjectDetail() {
           {id && <GradingTab projectId={id} />}
         </TabsContent>
 
+        {/* Feedback Tab */}
+        <TabsContent value="feedback" className="space-y-6" data-testid="content-feedback">
+          {id && <FeedbackTab projectId={id} />}
+        </TabsContent>
+
+        {/* Rubric Grading Tab */}
+        <TabsContent value="rubric-grading" className="space-y-6" data-testid="content-rubric-grading">
+          {id && <RubricGradingTab projectId={id} />}
+        </TabsContent>
+
         {/* Rubrics Tab */}
         <TabsContent value="rubrics" className="space-y-6" data-testid="content-rubrics">
           <Card>
@@ -636,6 +653,10 @@ export default function ProjectDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="evaluation" data-testid="content-evaluation">
+          <EvaluationTab projectId={id!} />
         </TabsContent>
       </Tabs>
 

@@ -75,7 +75,7 @@ app.use((req, _res, next) => {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; name: string };
       req.session.userId = decoded.userId;
-      
+
       // Populate req.user for route handlers
       req.user = {
         id: decoded.userId,
@@ -83,7 +83,7 @@ app.use((req, _res, next) => {
         role: decoded.role,
         name: decoded.name || '',
       };
-      
+
       console.log('[JWT Auth] User authenticated via token:', decoded.userId);
     } catch (error) {
       console.error('[JWT Auth] Invalid token:', error);
@@ -144,11 +144,7 @@ export default async function runApp(
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
 }

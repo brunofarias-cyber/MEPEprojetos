@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, primaryKey, unique, decimal } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -71,6 +71,13 @@ export const rubricCriteria = pgTable("rubric_criteria", {
   level2: text("level2").notNull(),
   level3: text("level3").notNull(),
   level4: text("level4").notNull(),
+  // Grade system fields
+  useGradeSystem: boolean("use_grade_system").default(false),
+  maxGrade: decimal("max_grade", { precision: 5, scale: 2 }).default("10.00"),
+  level1Grade: decimal("level1_grade", { precision: 5, scale: 2 }),
+  level2Grade: decimal("level2_grade", { precision: 5, scale: 2 }),
+  level3Grade: decimal("level3_grade", { precision: 5, scale: 2 }),
+  level4Grade: decimal("level4_grade", { precision: 5, scale: 2 }),
 });
 
 // Students table
@@ -82,6 +89,10 @@ export const students = pgTable("students", {
   avatar: text("avatar"),
   xp: integer("xp").notNull().default(0),
   level: integer("level").notNull().default(1),
+  // Portfolio fields
+  portfolioSlug: varchar("portfolio_slug").unique(),
+  portfolioVisible: boolean("portfolio_visible").default(true),
+  portfolioBio: text("portfolio_bio"),
 });
 
 // Achievements table
@@ -144,6 +155,17 @@ export const submissions = pgTable("submissions", {
   teacherFeedback: text("teacher_feedback"), // Feedback do professor
 });
 
+// Portfolio Items
+export const portfolioItems = pgTable("portfolio_items", {
+  id: varchar("id").primaryKey(),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  submissionId: varchar("submission_id").notNull().references(() => submissions.id, { onDelete: 'cascade' }),
+  displayOrder: integer("display_order").default(0),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueItem: unique().on(t.studentId, t.submissionId),
+}));
+
 // Classes (Turmas)
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey(),
@@ -203,6 +225,45 @@ export const eventResponses = pgTable("event_responses", {
   respondedAt: timestamp("responded_at"),
 });
 
+// Teams (Equipes/Grupos)
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Team Members
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey(),
+  teamId: varchar("team_id").notNull().references(() => teams.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  role: text("role"), // "leader", "member"
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+});
+
+// Evaluations (Avaliações de equipes e estudantes)
+export const evaluations = pgTable("evaluations", {
+  id: varchar("id").primaryKey(),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  teacherId: varchar("teacher_id").notNull().references(() => teachers.id, { onDelete: 'cascade' }),
+  teamId: varchar("team_id").references(() => teams.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }),
+  finalGrade: decimal("final_grade", { precision: 5, scale: 2 }).notNull(),
+  feedback: text("feedback"),
+  evaluatedAt: timestamp("evaluated_at").notNull().defaultNow(),
+});
+
+// Evaluation Scores (Pontuações por critério)
+export const evaluationScores = pgTable("evaluation_scores", {
+  id: varchar("id").primaryKey(),
+  evaluationId: varchar("evaluation_id").notNull().references(() => evaluations.id, { onDelete: 'cascade' }),
+  criteriaId: varchar("criteria_id").notNull().references(() => rubricCriteria.id, { onDelete: 'cascade' }),
+  level: integer("level").notNull(),
+  grade: decimal("grade", { precision: 5, scale: 2 }).notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertCoordinatorSchema = createInsertSchema(coordinators).omit({ id: true });
@@ -222,14 +283,52 @@ export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({
 export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
 export const insertEventResponseSchema = createInsertSchema(eventResponses).omit({ id: true, respondedAt: true });
-export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true });
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true }).extend({
+  notes: z.string().optional()
+});
+export const insertTeamSchema = createInsertSchema(teams).omit({ id: true, createdAt: true });
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id: true, joinedAt: true });
+export const insertEvaluationSchema = createInsertSchema(evaluations).omit({ id: true, evaluatedAt: true });
+export const insertEvaluationScoreSchema = createInsertSchema(evaluationScores).omit({ id: true });
+export const insertPortfolioItemSchema = createInsertSchema(portfolioItems).omit({ id: true, addedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+export type PortfolioItem = typeof portfolioItems.$inferSelect;
+export type InsertPortfolioItem = z.infer<typeof insertPortfolioItemSchema>;
+
 export type Coordinator = typeof coordinators.$inferSelect;
 export type InsertCoordinator = z.infer<typeof insertCoordinatorSchema>;
+
+// Analytics Types
+export interface AnalyticsOverview {
+  totalActiveProjects: number;
+  totalStudents: number;
+  averageSubmissionRate: number;
+  averageSatisfaction: number;
+}
+
+export interface EngagementMetric {
+  className: string;
+  submissionRate: number;
+  attendanceRate: number;
+}
+
+export interface BnccUsage {
+  competencyName: string;
+  usageCount: number;
+}
+
+export interface AtRiskStudent {
+  id: string;
+  name: string;
+  className: string;
+  xp: number;
+  absences: number;
+  missedSubmissions: number;
+}
 
 export type Teacher = typeof teachers.$inferSelect;
 export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
@@ -281,6 +380,18 @@ export type InsertEventResponse = z.infer<typeof insertEventResponseSchema>;
 
 export type Attendance = typeof attendance.$inferSelect;
 export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+
+export type Team = typeof teams.$inferSelect;
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+
+export type Evaluation = typeof evaluations.$inferSelect;
+export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
+
+export type EvaluationScore = typeof evaluationScores.$inferSelect;
+export type InsertEvaluationScore = z.infer<typeof insertEvaluationScoreSchema>;
 
 // Extended types for UI (with joined data)
 export type ProjectWithTeacher = Project & { teacherName: string };

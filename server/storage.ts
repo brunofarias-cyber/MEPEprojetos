@@ -1,29 +1,47 @@
 import { randomUUID } from "crypto";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql, not, ne, or } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
-  User, InsertUser,
+  User,
+  InsertUser,
   Coordinator, InsertCoordinator,
-  Teacher, InsertTeacher,
-  Project, InsertProject,
+  Teacher,
+  InsertTeacher,
+  Project,
+  InsertProject,
   ProjectPlanning, InsertProjectPlanning,
-  RubricCriteria, InsertRubricCriteria,
-  Student, InsertStudent,
-  Achievement, InsertAchievement,
-  StudentAchievement, InsertStudentAchievement,
-  BnccCompetency, InsertBnccCompetency,
+  RubricCriteria,
+  InsertRubricCriteria,
+  Student,
+  InsertStudent,
+  Achievement,
+  InsertAchievement,
+  StudentAchievement,
+  InsertStudentAchievement,
+  BnccCompetency,
+  InsertBnccCompetency,
   ProjectCompetency, InsertProjectCompetency,
-  Submission, InsertSubmission,
-  Class, InsertClass,
-  BnccDocument, InsertBnccDocument,
+  Submission,
+  InsertSubmission,
+  Class,
+  InsertClass,
+  BnccDocument,
+  InsertBnccDocument,
   Feedback, InsertFeedback,
   Event, InsertEvent,
   EventResponse, InsertEventResponse,
   ProjectWithTeacher,
   StudentAchievementWithDetails,
   Attendance, InsertAttendance,
-  StudentClass, InsertStudentClass,
+  StudentClass,
+  InsertStudentClass,
+  Team, InsertTeam,
+  TeamMember, InsertTeamMember,
+  Evaluation, InsertEvaluation,
+  EvaluationScore, InsertEvaluationScore,
+  PortfolioItem, InsertPortfolioItem,
+  AnalyticsOverview, EngagementMetric, BnccUsage, AtRiskStudent,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -154,6 +172,41 @@ export interface IStorage {
   addStudentToClass(studentClass: InsertStudentClass): Promise<StudentClass>;
   removeStudentFromClass(classId: string, studentId: string): Promise<void>;
   getStudentsByClass(classId: string): Promise<Student[]>;
+
+  // Teams
+  createTeam(team: InsertTeam): Promise<Team>;
+  getTeam(id: string): Promise<Team | undefined>;
+  getTeamsByProject(projectId: string): Promise<Team[]>;
+  updateTeam(id: string, team: Partial<InsertTeam>): Promise<Team | undefined>;
+  deleteTeam(id: string): Promise<boolean>;
+
+  // Team Members
+  addTeamMember(teamMember: InsertTeamMember): Promise<TeamMember>;
+  removeTeamMember(teamId: string, studentId: string): Promise<void>;
+  getTeamMembers(teamId: string): Promise<Student[]>;
+
+  // Evaluations
+  createEvaluation(evaluation: InsertEvaluation): Promise<Evaluation>;
+  getEvaluation(id: string): Promise<Evaluation | undefined>;
+  getEvaluationsByProject(projectId: string): Promise<Evaluation[]>;
+  updateEvaluation(id: string, evaluation: Partial<InsertEvaluation>): Promise<Evaluation | undefined>;
+  deleteEvaluation(id: string): Promise<boolean>;
+
+  // Evaluation Scores
+  getEvaluationScores(evaluationId: string): Promise<EvaluationScore[]>;
+  createEvaluationScore(score: InsertEvaluationScore): Promise<EvaluationScore>;
+
+  // Portfolio
+  getPortfolioItems(studentId: string): Promise<any[]>;
+  addToPortfolio(item: InsertPortfolioItem): Promise<PortfolioItem>;
+  removeFromPortfolio(id: string): Promise<boolean>;
+  getStudentByPortfolioSlug(slug: string): Promise<Student | undefined>;
+
+  // Analytics
+  getAnalyticsOverview(): Promise<AnalyticsOverview>;
+  getEngagementMetrics(): Promise<EngagementMetric[]>;
+  getBnccUsage(): Promise<BnccUsage[]>;
+  getAtRiskStudents(): Promise<AtRiskStudent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -417,6 +470,119 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated || undefined;
   }
+
+  /**
+   * Track achievement progress and unlock when completed
+   * Returns true if achievement was unlocked, false otherwise
+   */
+  async trackAchievementProgress(
+    studentId: string,
+    achievementId: string,
+    increment: number = 1,
+    total?: number
+  ): Promise<{ unlocked: boolean; xpAwarded: number }> {
+    // Get achievement details
+    const achievement = await this.getAchievement(achievementId);
+    if (!achievement) {
+      return { unlocked: false, xpAwarded: 0 };
+    }
+
+    // Check if student already has this achievement
+    const existingProgress = await db.select()
+      .from(schema.studentAchievements)
+      .where(and(
+        eq(schema.studentAchievements.studentId, studentId),
+        eq(schema.studentAchievements.achievementId, achievementId)
+      ))
+      .limit(1);
+
+    const existing = existingProgress[0];
+
+    // If already unlocked, do nothing
+    if (existing?.unlocked) {
+      return { unlocked: false, xpAwarded: 0 };
+    }
+
+    // Determine total (use provided total or default to 1 for single achievements)
+    const achievementTotal = total || existing?.total || 1;
+    const currentProgress = existing?.progress || 0;
+    const newProgress = currentProgress + increment;
+
+    // Check if achievement is now unlocked
+    const nowUnlocked = newProgress >= achievementTotal;
+
+    if (existing) {
+      // Update existing record
+      await db.update(schema.studentAchievements)
+        .set({
+          progress: newProgress,
+          unlocked: nowUnlocked,
+          total: achievementTotal
+        })
+        .where(eq(schema.studentAchievements.id, existing.id));
+    } else {
+      // Create new record
+      const id = randomUUID();
+      await db.insert(schema.studentAchievements).values({
+        id,
+        studentId,
+        achievementId,
+        progress: newProgress,
+        total: achievementTotal,
+        unlocked: nowUnlocked,
+      });
+    }
+
+    // If unlocked, award XP to student
+    if (nowUnlocked) {
+      const student = await this.getStudent(studentId);
+      if (student) {
+        const newXp = student.xp + achievement.xp;
+        const newLevel = Math.floor(newXp / 100) + 1; // Simple level calculation: 100 XP per level
+
+        await db.update(schema.students)
+          .set({
+            xp: newXp,
+            level: newLevel
+          })
+          .where(eq(schema.students.id, studentId));
+
+        // Check level-based achievements
+        await this.checkLevelAchievements(studentId, newLevel, newXp);
+
+        return { unlocked: true, xpAwarded: achievement.xp };
+      }
+    }
+
+    return { unlocked: false, xpAwarded: 0 };
+  }
+
+  /**
+   * Check and unlock level-based achievements
+   */
+  private async checkLevelAchievements(studentId: string, level: number, xp: number): Promise<void> {
+    // Level 5 - Motivated Beginner
+    if (level >= 5) {
+      await this.trackAchievementProgress(studentId, 'ach-iniciante-motivado', 1, 1);
+    }
+
+    // Level 10 - Dedicated Student
+    if (level >= 10) {
+      await this.trackAchievementProgress(studentId, 'ach-estudante-dedicado', 1, 1);
+    }
+
+    // Level 20 - Expert
+    if (level >= 20) {
+      await this.trackAchievementProgress(studentId, 'ach-expert', 1, 1);
+    }
+
+    // 1000 XP Collector
+    if (xp >= 1000) {
+      await this.trackAchievementProgress(studentId, 'ach-coletor-xp', 1, 1);
+    }
+  }
+
+
 
   // BNCC Competencies
   async getCompetency(id: string): Promise<BnccCompetency | undefined> {
@@ -766,9 +932,27 @@ export class DatabaseStorage implements IStorage {
 
   // Attendance
   async createAttendance(insertAttendance: InsertAttendance): Promise<Attendance> {
-    const id = randomUUID();
-    const [attendance] = await db.insert(schema.attendance).values({ ...insertAttendance, id }).returning();
-    return attendance;
+    // Check if attendance already exists for this student, class and date
+    const [existing] = await db.select().from(schema.attendance)
+      .where(and(
+        eq(schema.attendance.classId, insertAttendance.classId),
+        eq(schema.attendance.studentId, insertAttendance.studentId),
+        eq(schema.attendance.date, insertAttendance.date)
+      ));
+
+    if (existing) {
+      // Update existing record
+      const [updated] = await db.update(schema.attendance)
+        .set({ status: insertAttendance.status, notes: insertAttendance.notes })
+        .where(eq(schema.attendance.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create new record
+      const id = randomUUID();
+      const [attendance] = await db.insert(schema.attendance).values({ ...insertAttendance, id }).returning();
+      return attendance;
+    }
   }
 
   async getAttendanceByClass(classId: string, date: string): Promise<Attendance[]> {
@@ -820,6 +1004,388 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.studentClasses.classId, classId));
 
     return results.map(r => r.student);
+  }
+
+  // ===== TEAMS =====
+  async createTeam(insertTeam: InsertTeam): Promise<Team> {
+    const id = randomUUID();
+    const [team] = await db.insert(schema.teams).values({ ...insertTeam, id }).returning();
+    return team;
+  }
+
+  async getTeamsByProject(projectId: string): Promise<Team[]> {
+    return await db.select().from(schema.teams).where(eq(schema.teams.projectId, projectId));
+  }
+
+  async getTeam(id: string): Promise<Team | undefined> {
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    return team;
+  }
+
+  async updateTeam(id: string, update: Partial<InsertTeam>): Promise<Team | undefined> {
+    const [updated] = await db.update(schema.teams)
+      .set(update)
+      .where(eq(schema.teams.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTeam(id: string): Promise<boolean> {
+    const result = await db.delete(schema.teams).where(eq(schema.teams.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // ===== TEAM MEMBERS =====
+  async addStudentToTeam(teamId: string, studentId: string, role?: string): Promise<TeamMember> {
+    const id = randomUUID();
+    const [member] = await db.insert(schema.teamMembers).values({
+      id,
+      teamId,
+      studentId,
+      role: role || "member",
+    }).returning();
+    return member;
+  }
+
+  async getTeamMembers(teamId: string): Promise<Student[]> {
+    const results = await db.select({
+      student: schema.students
+    })
+      .from(schema.teamMembers)
+      .innerJoin(schema.students, eq(schema.teamMembers.studentId, schema.students.id))
+      .where(eq(schema.teamMembers.teamId, teamId));
+
+    return results.map(r => r.student);
+  }
+
+  async removeStudentFromTeam(teamId: string, studentId: string): Promise<boolean> {
+    const result = await db.delete(schema.teamMembers)
+      .where(and(
+        eq(schema.teamMembers.teamId, teamId),
+        eq(schema.teamMembers.studentId, studentId)
+      ));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // ===== EVALUATIONS =====
+  async createEvaluation(insertEvaluation: InsertEvaluation): Promise<Evaluation> {
+    const id = randomUUID();
+    const [evaluation] = await db.insert(schema.evaluations).values({ ...insertEvaluation, id }).returning();
+    return evaluation;
+  }
+
+  async getEvaluationsByProject(projectId: string): Promise<Evaluation[]> {
+    return await db.select().from(schema.evaluations).where(eq(schema.evaluations.projectId, projectId));
+  }
+
+  async getEvaluationByTeam(teamId: string): Promise<Evaluation | undefined> {
+    const [evaluation] = await db.select().from(schema.evaluations).where(eq(schema.evaluations.teamId, teamId));
+    return evaluation;
+  }
+
+  async getEvaluationByStudent(projectId: string, studentId: string): Promise<Evaluation | undefined> {
+    const [evaluation] = await db.select().from(schema.evaluations)
+      .where(and(
+        eq(schema.evaluations.projectId, projectId),
+        eq(schema.evaluations.studentId, studentId)
+      ));
+    return evaluation;
+  }
+
+  async updateEvaluation(id: string, update: Partial<InsertEvaluation>): Promise<Evaluation | undefined> {
+    const [updated] = await db.update(schema.evaluations)
+      .set(update)
+      .where(eq(schema.evaluations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEvaluation(id: string): Promise<boolean> {
+    const result = await db.delete(schema.evaluations).where(eq(schema.evaluations.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // ===== EVALUATION SCORES =====
+  async saveEvaluationScores(evaluationId: string, scores: InsertEvaluationScore[]): Promise<void> {
+    // Delete existing scores for this evaluation
+    await db.delete(schema.evaluationScores).where(eq(schema.evaluationScores.evaluationId, evaluationId));
+
+    // Insert new scores
+    if (scores.length > 0) {
+      const scoresWithIds = scores.map(score => ({
+        ...score,
+        id: randomUUID(),
+        evaluationId,
+      }));
+      await db.insert(schema.evaluationScores).values(scoresWithIds);
+    }
+  }
+
+  async getEvaluationScores(evaluationId: string): Promise<EvaluationScore[]> {
+    return await db.select().from(schema.evaluationScores)
+      .where(eq(schema.evaluationScores.evaluationId, evaluationId));
+  }
+
+  async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
+    return await db.select().from(schema.submissions).where(eq(schema.submissions.studentId, studentId));
+  }
+
+  async getStudentsByTeacher(teacherId: string): Promise<Student[]> {
+    // Get all classes for the teacher
+    const classes = await db.select().from(schema.classes).where(eq(schema.classes.teacherId, teacherId));
+    const classIds = classes.map(c => c.id);
+
+    if (classIds.length === 0) return [];
+
+    // Get all students in these classes
+    const students = await db.select({
+      student: schema.students
+    })
+      .from(schema.studentClasses)
+      .innerJoin(schema.students, eq(schema.studentClasses.studentId, schema.students.id))
+      .where(inArray(schema.studentClasses.classId, classIds));
+
+    return students.map(s => s.student);
+  }
+
+  async getPortfolioItems(studentId: string): Promise<any[]> {
+    const items = await db
+      .select({
+        id: schema.portfolioItems.id,
+        studentId: schema.portfolioItems.studentId,
+        submissionId: schema.portfolioItems.submissionId,
+        displayOrder: schema.portfolioItems.displayOrder,
+        addedAt: schema.portfolioItems.addedAt,
+        project: schema.projects,
+        submission: schema.submissions,
+      })
+      .from(schema.portfolioItems)
+      .innerJoin(schema.submissions, eq(schema.portfolioItems.submissionId, schema.submissions.id))
+      .innerJoin(schema.projects, eq(schema.submissions.projectId, schema.projects.id))
+      .where(eq(schema.portfolioItems.studentId, studentId))
+      .orderBy(schema.portfolioItems.displayOrder);
+
+    return items;
+  }
+
+  async addToPortfolio(item: InsertPortfolioItem): Promise<PortfolioItem> {
+    const id = randomUUID();
+    const [newItem] = await db
+      .insert(schema.portfolioItems)
+      .values({ ...item, id })
+      .returning();
+    return newItem;
+  }
+
+  async removeFromPortfolio(id: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(schema.portfolioItems)
+      .where(eq(schema.portfolioItems.id, id))
+      .returning();
+    return !!deleted;
+  }
+
+  async getStudentByPortfolioSlug(slug: string): Promise<Student | undefined> {
+    const [student] = await db
+      .select()
+      .from(schema.students)
+      .where(eq(schema.students.portfolioSlug, slug));
+    return student;
+  }
+
+  // Missing Methods Implementation
+  async addTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    const [newMember] = await db
+      .insert(schema.teamMembers)
+      .values(member)
+      .returning();
+    return newMember;
+  }
+
+  async removeTeamMember(id: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(schema.teamMembers)
+      .where(eq(schema.teamMembers.id, id))
+      .returning();
+    return !!deleted;
+  }
+
+  async getEvaluation(id: string): Promise<Evaluation | undefined> {
+    const [evaluation] = await db
+      .select()
+      .from(schema.evaluations)
+      .where(eq(schema.evaluations.id, id));
+    return evaluation;
+  }
+
+  async createEvaluationScore(score: InsertEvaluationScore): Promise<EvaluationScore> {
+    const [newScore] = await db
+      .insert(schema.evaluationScores)
+      .values(score)
+      .returning();
+    return newScore;
+  }
+
+  // Analytics Implementation
+  async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+    // Total Active Projects
+    const projects = await db.select().from(schema.projects);
+    const activeProjects = projects.filter(p => p.status !== 'Concluído');
+
+    // Total Students
+    const students = await db.select().from(schema.students);
+
+    // Average Submission Rate
+    const submissions = await db.select().from(schema.submissions);
+    const submissionRate = calculateSubmissionRate(
+      submissions.length,
+      students.length,
+      activeProjects.length
+    );
+
+    // Average Grade (using as proxy for satisfaction)
+    const averageGrade = calculateAverageGrade(submissions);
+
+    return {
+      totalActiveProjects: activeProjects.length,
+      totalStudents: students.length,
+      averageSubmissionRate: submissionRate,
+      averageSatisfaction: averageGrade,
+    };
+  }
+
+  async getEngagementMetrics(): Promise<EngagementMetric[]> {
+    const classes = await db.select().from(schema.classes);
+    const metrics: EngagementMetric[] = [];
+
+    for (const cls of classes) {
+      // Get students in class
+      const studentClasses = await db.select()
+        .from(schema.studentClasses)
+        .where(eq(schema.studentClasses.classId, cls.id));
+      const studentIds = studentClasses.map(sc => sc.studentId);
+
+      if (studentIds.length === 0) {
+        metrics.push({ className: cls.name, submissionRate: 0, attendanceRate: 0 });
+        continue;
+      }
+
+      // Calculate Submission Rate
+      const classSubmissions = await db.select()
+        .from(schema.submissions)
+        .where(inArray(schema.submissions.studentId, studentIds));
+
+      const submissionRate = calculateEngagement(
+        classSubmissions.length,
+        studentIds.length,
+        5 // benchmark: 5 projects
+      );
+
+      // Calculate Attendance Rate
+      const presentRecords = await db.select()
+        .from(schema.attendance)
+        .where(and(
+          eq(schema.attendance.classId, cls.id),
+          eq(schema.attendance.status, 'present')
+        ));
+
+      const allAttendance = await db.select()
+        .from(schema.attendance)
+        .where(eq(schema.attendance.classId, cls.id));
+
+      const attendanceRate = calculateAttendanceRate(
+        presentRecords.length,
+        allAttendance.length
+      );
+
+      metrics.push({
+        className: cls.name,
+        submissionRate,
+        attendanceRate
+      });
+    }
+
+    return metrics;
+  }
+
+  async getBnccUsage(): Promise<BnccUsage[]> {
+    // Count project competencies
+    const projectCompetencies = await db.select().from(schema.projectCompetencies);
+    const usageMap = new Map<string, number>();
+
+    for (const pc of projectCompetencies) {
+      // We need to fetch the competency name. 
+      // This is N+1, but for analytics on small dataset it's acceptable. 
+      // Better: join with bncc_competencies table.
+      const comp = await db.select().from(schema.bnccCompetencies).where(eq(schema.bnccCompetencies.id, pc.competencyId));
+      if (comp.length > 0) {
+        const name = comp[0].name;
+        usageMap.set(name, (usageMap.get(name) || 0) + 1);
+      }
+    }
+
+    return Array.from(usageMap.entries())
+      .map(([competencyName, usageCount]) => ({ competencyName, usageCount }))
+      .sort((a, b) => b.usageCount - a.usageCount)
+      .slice(0, 10); // Top 10
+  }
+
+  async getAtRiskStudents(): Promise<AtRiskStudent[]> {
+    // Define risk: Low XP, High Absences, or Missing Submissions
+    const students = await db.select().from(schema.students);
+    const atRisk: AtRiskStudent[] = [];
+
+    for (const student of students) {
+      // Get class name (first class found)
+      const studentClasses = await db.select()
+        .from(schema.studentClasses)
+        .innerJoin(schema.classes, eq(schema.studentClasses.classId, schema.classes.id))
+        .where(eq(schema.studentClasses.studentId, student.id));
+
+      const className = studentClasses.length > 0 ? studentClasses[0].classes.name : "Sem turma";
+
+      // Count absences
+      const absences = await db.select()
+        .from(schema.attendance)
+        .where(and(
+          eq(schema.attendance.studentId, student.id),
+          eq(schema.attendance.status, 'absent')
+        ));
+
+      // Count submissions
+      const submissions = await db.select()
+        .from(schema.submissions)
+        .where(eq(schema.submissions.studentId, student.id));
+
+      // Check if student is at risk using helper
+      if (isStudentAtRisk(student, absences.length, submissions.length)) {
+        atRisk.push({
+          id: student.id,
+          name: student.name,
+          className,
+          xp: student.xp,
+          absences: absences.length,
+          missedSubmissions: 0 // Placeholder - would need project assignments
+        });
+      }
+    }
+
+    return atRisk;
+  }
+
+  async getSubmissionsByProject(projectId: string): Promise<Submission[]> {
+    return await db.select().from(schema.submissions).where(eq(schema.submissions.projectId, projectId));
+  }
+
+  async getTeamsByStudent(studentId: string): Promise<Team[]> {
+    const results = await db.select({
+      team: schema.teams
+    })
+      .from(schema.teamMembers)
+      .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
+      .where(eq(schema.teamMembers.studentId, studentId));
+
+    return results.map(r => r.team);
   }
 }
 
