@@ -2,10 +2,10 @@ import { Icon } from "@/components/Icon";
 import type { StudentAchievementWithDetails } from "@shared/schema";
 
 interface StudentAchievementsProps {
-  achievements: StudentAchievementWithDetails[];
+  achievements?: StudentAchievementWithDetails[];
 }
 
-export default function StudentAchievements({ achievements }: StudentAchievementsProps) {
+export default function StudentAchievements({ achievements = [] }: StudentAchievementsProps) {
   const mockAchievements = [
     { id: '1', title: "Pontualidade Britânica", desc: "Entregar 3 tarefas antes do prazo final.", xp: 500, progress: 2, total: 3, icon: "clock", unlocked: false },
     { id: '2', title: "Mestre da BNCC", desc: "Completar todas as competências de um projeto.", xp: 1000, progress: 8, total: 10, icon: "award", unlocked: false },

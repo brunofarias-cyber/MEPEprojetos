@@ -2,10 +2,10 @@ import { ProjectCard } from "@/components/ProjectCard";
 import type { ProjectWithTeacher } from "@shared/schema";
 
 interface StudentProjectsProps {
-  projects: ProjectWithTeacher[];
+  projects?: ProjectWithTeacher[];
 }
 
-export default function StudentProjects({ projects }: StudentProjectsProps) {
+export default function StudentProjects({ projects = [] }: StudentProjectsProps) {
   return (
     <div className="animate-fade-in space-y-8">
       <div>

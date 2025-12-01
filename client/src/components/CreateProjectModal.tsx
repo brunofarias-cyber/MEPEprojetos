@@ -31,7 +31,7 @@ const projectFormSchema = z.object({
   deadlineLabel: z.string().nullable().transform(val => (val?.trim() ? val.trim() : null)).default(null),
 });
 
-type ProjectFormValues = z.input<typeof projectFormSchema>;
+type ProjectFormValues = z.output<typeof projectFormSchema>;
 
 export function CreateProjectModal() {
   const [open, setOpen] = useState(false);

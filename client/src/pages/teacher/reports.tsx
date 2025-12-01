@@ -6,10 +6,10 @@ import html2canvas from "html2canvas";
 import { useToast } from "@/hooks/use-toast";
 
 interface TeacherReportsProps {
-  competencies: BnccCompetency[];
+  competencies?: BnccCompetency[];
 }
 
-export default function TeacherReports({ competencies }: TeacherReportsProps) {
+export default function TeacherReports({ competencies = [] }: TeacherReportsProps) {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
 
