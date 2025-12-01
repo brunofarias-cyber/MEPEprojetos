@@ -7,6 +7,7 @@ import type { InsertProject } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { parseApiError } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -90,10 +91,11 @@ export function CreateProjectModal() {
         deadlineLabel: null,
       });
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
+      const parsed = parseApiError(error);
       toast({
         title: "Erro ao criar projeto",
-        description: error.message,
+        description: parsed.message,
         variant: "destructive",
       });
     },
