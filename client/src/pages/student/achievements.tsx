@@ -173,6 +173,7 @@ function getDefaultTotal(achievementId: string): number {
     'ach-colaborador-ativo': 5,
     'ach-trabalho-equipe': 5,
     'ach-criativo': 3,
+    'ach-trabalho-duro': 5,
   };
   return totals[achievementId] || 1;
 }

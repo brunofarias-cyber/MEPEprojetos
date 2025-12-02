@@ -1,9 +1,32 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+class ApiError extends Error {
+  status: number;
+  body?: any;
+  constructor(status: number, message: string, body?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const contentType = res.headers.get("content-type") || "";
+    let body: any = undefined;
+    try {
+      if (contentType.includes("application/json")) {
+        body = await res.json();
+      } else {
+        body = await res.text();
+      }
+    } catch (_) {
+      body = await res.text().catch(() => undefined);
+    }
+
+    const message = (body && (body.message || body.error)) || res.statusText || String(body) || `${res.status}`;
+    throw new ApiError(res.status, String(message), body);
   }
 }
 
@@ -35,11 +58,25 @@ export async function apiRequest(
 
   await throwIfResNotOk(res);
 
-  const contentType = res.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
     return await res.json();
   }
   return res;
+}
+
+export function isApiError(e: unknown): e is ApiError {
+  return !!e && typeof e === 'object' && (e as any).name === 'ApiError';
+}
+
+export function parseApiError(e: unknown): { status?: number; message: string } {
+  if (isApiError(e)) {
+    const msg = e.message || (e.body && (e.body.message || JSON.stringify(e.body))) || `HTTP ${e.status}`;
+    return { status: e.status, message: msg };
+  }
+
+  if (e instanceof Error) return { message: e.message };
+  return { message: String(e) };
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
