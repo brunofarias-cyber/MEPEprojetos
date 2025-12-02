@@ -144,8 +144,16 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === '/achievements'}>
                       <Link href="/achievements" data-testid="nav-conquistas">
-                        <Icon name="award" size={20} />
-                        <span>Conquistas</span>
+                        <Icon name="trophy" size={20} />
+                        <span>Minhas Conquistas</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/portfolio'}>
+                      <Link href="/portfolio" data-testid="nav-portfolio">
+                        <Icon name="globe" size={20} />
+                        <span>Meu Portfolio</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

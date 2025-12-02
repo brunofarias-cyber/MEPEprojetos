@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar as CalendarIcon, MapPin, Clock, Plus, Edit2, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon, MapPin, Clock, Plus, Edit2, Trash2, Bell, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, isSameDay, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Project, Event, Teacher, Submission } from "@shared/schema";
 
@@ -24,6 +26,7 @@ const eventFormSchema = z.object({
   eventDate: z.string().min(1, "Selecione uma data"),
   eventTime: z.string().min(1, "Selecione um horário"),
   location: z.string().min(1, "Digite um local"),
+  notifyStudents: z.boolean().default(false).optional(),
 });
 
 type EventFormData = z.infer<typeof eventFormSchema>;
@@ -32,8 +35,10 @@ export default function TeacherCalendar() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
-  const { data: teacher } = useQuery<Teacher>({
+  const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher>({
     queryKey: ["/api/me/teacher"],
   });
 
@@ -46,27 +51,24 @@ export default function TeacherCalendar() {
     enabled: !!teacher?.id,
   });
 
-  // Fetch all submissions for all projects (to show in calendar)
-  const { data: allSubmissions = [] } = useQuery<Submission[]>({
-    queryKey: ["/api/submissions/all"], // We might need a new route or just filter client side if we fetch per project. 
-    // Since we don't have a "get all submissions" route for teacher easily, let's iterate projects or add a route.
-    // For now, let's assume we can get them or just show project deadlines which are more critical.
-    // Actually, let's stick to Project Deadlines first as requested "datas importantes".
-  });
-
   // Combine events with project deadlines
   const combinedEvents = [
     ...events.map(e => ({ ...e, type: 'meeting' })),
-    ...projects.filter(p => p.nextDeadline).map(p => ({
-      id: `deadline-${p.id}`,
-      title: `Entrega: ${p.title}`,
-      description: p.deadlineLabel || "Prazo de entrega do projeto",
-      date: p.nextDeadline!.split('T')[0],
-      time: "23:59",
-      location: "Online",
-      projectId: p.id,
-      type: 'deadline'
-    }))
+    ...projects.filter(p => p.nextDeadline).map(p => {
+      const deadlineDate = new Date(p.nextDeadline!);
+      const isValidDate = !isNaN(deadlineDate.getTime());
+
+      return {
+        id: `deadline-${p.id}`,
+        title: `Entrega: ${p.title}`,
+        description: p.deadlineLabel || "Prazo de entrega do projeto",
+        date: isValidDate ? deadlineDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        time: "23:59",
+        location: "Online",
+        projectId: p.id,
+        type: 'deadline'
+      };
+    })
   ];
 
   const form = useForm<EventFormData>({
@@ -78,6 +80,7 @@ export default function TeacherCalendar() {
       eventDate: "",
       eventTime: "",
       location: "",
+      notifyStudents: false,
     },
   });
 
@@ -90,15 +93,18 @@ export default function TeacherCalendar() {
       eventDate: "",
       eventTime: "",
       location: "",
+      notifyStudents: false,
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: EventFormData) => {
-      return await apiRequest(`/api/events`, {
+      if (!teacher?.id) throw new Error("Professor não identificado");
+
+      const response = await apiRequest(`/api/events`, {
         method: "POST",
         body: JSON.stringify({
-          teacherId: teacher?.id,
+          teacherId: teacher.id,
           projectId: data.projectId || null,
           title: data.title,
           description: data.description || "",
@@ -107,6 +113,24 @@ export default function TeacherCalendar() {
           location: data.location,
         }),
       });
+
+      if (data.notifyStudents) {
+        try {
+          await apiRequest(`/api/events/${response.id}/notify`, { method: "POST" });
+          toast({
+            title: "Notificações enviadas",
+            description: "Os alunos do projeto foram notificados.",
+          });
+        } catch (error) {
+          console.error("Erro ao enviar notificações:", error);
+          toast({
+            title: "Aviso",
+            description: "Evento criado, mas houve erro ao notificar alunos.",
+          });
+        }
+      }
+
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events/teacher", teacher?.id] });
@@ -117,10 +141,11 @@ export default function TeacherCalendar() {
         description: "A reunião foi agendada com sucesso.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Erro ao criar evento:", error);
       toast({
-        title: "Erro",
-        description: "Não foi possível criar o evento.",
+        title: "Erro ao criar evento",
+        description: error.message || "Verifique os dados e tente novamente.",
         variant: "destructive",
       });
     },
@@ -128,7 +153,7 @@ export default function TeacherCalendar() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: EventFormData }) => {
-      return await apiRequest(`/api/events/${id}`, {
+      const response = await apiRequest(`/api/events/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
           projectId: data.projectId || null,
@@ -139,6 +164,24 @@ export default function TeacherCalendar() {
           location: data.location,
         }),
       });
+
+      if (data.notifyStudents) {
+        try {
+          await apiRequest(`/api/events/${id}/notify`, { method: "POST" });
+          toast({
+            title: "Notificações enviadas",
+            description: "Os alunos do projeto foram notificados.",
+          });
+        } catch (error) {
+          console.error("Erro ao enviar notificações:", error);
+          toast({
+            title: "Aviso",
+            description: "Evento atualizado, mas houve erro ao notificar alunos.",
+          });
+        }
+      }
+
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events/teacher", teacher?.id] });
@@ -149,10 +192,11 @@ export default function TeacherCalendar() {
         description: "A reunião foi atualizada com sucesso.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Erro ao atualizar evento:", error);
       toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o evento.",
+        title: "Erro ao atualizar evento",
+        description: error.message || "Verifique os dados e tente novamente.",
         variant: "destructive",
       });
     },
@@ -171,10 +215,10 @@ export default function TeacherCalendar() {
         description: "A reunião foi cancelada.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: "Não foi possível remover o evento.",
+        description: error.message || "Não foi possível remover o evento.",
         variant: "destructive",
       });
     },
@@ -198,6 +242,7 @@ export default function TeacherCalendar() {
       eventDate: event.date,
       eventTime: event.time,
       location: event.location,
+      notifyStudents: false,
     });
   };
 
@@ -207,9 +252,18 @@ export default function TeacherCalendar() {
     return dateTimeA - dateTimeB;
   });
 
+  // Get events for selected date
+  const selectedDateEvents = sortedEvents.filter(event => {
+    const eventDate = parseISO(event.date);
+    return isSameDay(eventDate, selectedDate);
+  });
+
+  // Get dates with events for highlighting
+  const datesWithEvents = Array.from(new Set(sortedEvents.map(e => e.date))).map(date => parseISO(date));
+
   return (
     <div className="h-full overflow-auto p-8 space-y-6" data-testid="page-teacher-calendar">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">
@@ -222,7 +276,7 @@ export default function TeacherCalendar() {
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-create-event">
+              <Button data-testid="button-create-event" disabled={isLoadingTeacher || !teacher}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Reunião
               </Button>
@@ -357,6 +411,29 @@ export default function TeacherCalendar() {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="notifyStudents"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Notificar Estudantes
+                          </FormLabel>
+                          <FormDescription>
+                            Enviar uma notificação para os alunos do projeto selecionado.
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
                   <DialogFooter>
                     <Button
                       type="button"
@@ -387,251 +464,316 @@ export default function TeacherCalendar() {
           <div className="text-center py-12 text-muted-foreground" data-testid="text-loading">
             Carregando eventos...
           </div>
-        ) : sortedEvents.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <CalendarIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground" data-testid="text-empty-state">
-                Nenhuma reunião agendada ainda. Clique em "Nova Reunião" para começar.
-              </p>
-            </CardContent>
-          </Card>
         ) : (
-          <div className="space-y-4">
-            {sortedEvents.map((event) => {
-              const project = projects.find((p) => p.id === event.projectId);
-              const eventDate = new Date(`${event.date}T${event.time}`);
-
-              const isDeadline = (event as any).type === 'deadline';
-
-              return (
-                <Card
-                  key={event.id}
-                  className={`hover-elevate transition-all ${isDeadline ? 'border-l-4 border-l-orange-500 bg-orange-50/30' : 'cursor-pointer hover:shadow-lg'}`}
-                  data-testid={`card-event-${event.id}`}
-                  onClick={() => {
-                    if (!isDeadline) {
-                      startEdit(event as Event);
-                    }
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Calendar View */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const newMonth = new Date(currentMonth);
+                        newMonth.setMonth(currentMonth.getMonth() - 1);
+                        setCurrentMonth(newMonth);
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = new Date();
+                        setCurrentMonth(today);
+                        setSelectedDate(today);
+                      }}
+                    >
+                      Hoje
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const newMonth = new Date(currentMonth);
+                        newMonth.setMonth(currentMonth.getMonth() + 1);
+                        setCurrentMonth(newMonth);
+                      }}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  modifiers={{
+                    hasEvents: datesWithEvents
                   }}
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="mb-2" data-testid={`text-event-title-${event.id}`}>
-                          {event.title}
-                        </CardTitle>
-                        {project && (
-                          <div className="inline-block px-2 py-1 rounded text-xs font-medium bg-primary/10 text-primary mb-2" data-testid={`text-event-project-${event.id}`}>
-                            {project.title}
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mt-2">
-                          <div className="flex items-center gap-2">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span data-testid={`text-event-date-${event.id}`}>
-                              {format(eventDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            <span data-testid={`text-event-time-${event.id}`}>
+                  modifiersClassNames={{
+                    hasEvents: "bg-primary/20 font-bold text-primary"
+                  }}
+                  className="rounded-md border"
+                  locale={ptBR}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Events List for Selected Date */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>
+                  {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {selectedDateEvents.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    Nenhum evento neste dia
+                  </div>
+                ) : (
+                  selectedDateEvents.map((event) => {
+                    const project = projects.find((p) => p.id === event.projectId);
+                    const eventDate = new Date(`${event.date}T${event.time}`);
+                    const isDeadline = (event as any).type === 'deadline';
+
+                    return (
+                      <Card
+                        key={event.id}
+                        className={`${isDeadline ? 'border-l-4 border-l-orange-500 bg-orange-50/30' : 'cursor-pointer hover:shadow-md'} transition-all`}
+                        onClick={() => {
+                          if (!isDeadline) {
+                            startEdit(event as Event);
+                          }
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="font-semibold text-sm">{event.title}</div>
+                            {project && (
+                              <div className="inline-block px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                                {project.title}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3" />
                               {format(eventDate, "HH:mm")}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            <span data-testid={`text-event-location-${event.id}`}>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <MapPin className="w-3 h-3" />
                               {event.location}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        {!(event as any).type || (event as any).type === 'meeting' ? (
-                          <>
-                            <Dialog
-                              open={editingEvent?.id === event.id}
-                              onOpenChange={(open) => {
-                                if (!open) {
-                                  setEditingEvent(null);
-                                  editForm.reset();
-                                }
-                              }}
-                            >
-                              <DialogTrigger asChild>
+                            </div>
+                            {!isDeadline && (
+                              <div className="flex gap-1 pt-2">
                                 <Button
-                                  size="icon"
+                                  size="sm"
                                   variant="ghost"
-                                  onClick={() => startEdit(event as Event)}
-                                  data-testid={`button-edit-event-${event.id}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEdit(event as Event);
+                                  }}
                                 >
-                                  <Edit2 className="w-4 h-4" />
+                                  <Edit2 className="w-3 h-3" />
                                 </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                  <DialogTitle>Editar Reunião</DialogTitle>
-                                </DialogHeader>
-
-                                <Form {...editForm}>
-                                  <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                                    <FormField
-                                      control={editForm.control}
-                                      name="title"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Título *</FormLabel>
-                                          <FormControl>
-                                            <Input data-testid="input-edit-event-title" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-
-                                    <FormField
-                                      control={editForm.control}
-                                      name="projectId"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Projeto</FormLabel>
-                                          <Select value={field.value} onValueChange={field.onChange}>
-                                            <FormControl>
-                                              <SelectTrigger>
-                                                <SelectValue placeholder="Selecione um projeto" />
-                                              </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                              <SelectItem value="">Nenhum projeto</SelectItem>
-                                              {projects.map((project) => (
-                                                <SelectItem key={project.id} value={project.id}>
-                                                  {project.title}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <FormField
-                                        control={editForm.control}
-                                        name="eventDate"
-                                        render={({ field }) => (
-                                          <FormItem>
-                                            <FormLabel>Data *</FormLabel>
-                                            <FormControl>
-                                              <Input type="date" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
-
-                                      <FormField
-                                        control={editForm.control}
-                                        name="eventTime"
-                                        render={({ field }) => (
-                                          <FormItem>
-                                            <FormLabel>Horário *</FormLabel>
-                                            <FormControl>
-                                              <Input type="time" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                          </FormItem>
-                                        )}
-                                      />
-                                    </div>
-
-                                    <FormField
-                                      control={editForm.control}
-                                      name="location"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Local *</FormLabel>
-                                          <FormControl>
-                                            <Input {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-
-                                    <FormField
-                                      control={editForm.control}
-                                      name="description"
-                                      render={({ field }) => (
-                                        <FormItem>
-                                          <FormLabel>Descrição</FormLabel>
-                                          <FormControl>
-                                            <Textarea
-                                              rows={3}
-                                              className="resize-none"
-                                              {...field}
-                                            />
-                                          </FormControl>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-
-                                    <DialogFooter>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                          setEditingEvent(null);
-                                          editForm.reset();
-                                        }}
-                                      >
-                                        Cancelar
-                                      </Button>
-                                      <Button
-                                        type="submit"
-                                        disabled={updateMutation.isPending}
-                                        data-testid="button-update-event"
-                                      >
-                                        {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
-                                      </Button>
-                                    </DialogFooter>
-                                  </form>
-                                </Form>
-                              </DialogContent>
-                            </Dialog>
-
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => deleteMutation.mutate(event.id)}
-                              disabled={deleteMutation.isPending}
-                              data-testid={`button-delete-event-${event.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <div className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium border border-orange-200">
-                            Prazo
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteMutation.mutate(event.id);
+                                  }}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  {event.description && (
-                    <CardContent>
-                      <p className="text-sm text-foreground whitespace-pre-wrap" data-testid={`text-event-description-${event.id}`}>
-                        {event.description}
-                      </p>
-                    </CardContent>
-                  )}
-                </Card>
-              );
-            })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
           </div>
+        )}
+
+        {/* Edit Dialog */}
+        {editingEvent && (
+          <Dialog
+            open={!!editingEvent}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEditingEvent(null);
+                editForm.reset();
+              }
+            }}
+          >
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Editar Reunião</DialogTitle>
+              </DialogHeader>
+
+              <Form {...editForm}>
+                <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                  <FormField
+                    control={editForm.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Título *</FormLabel>
+                        <FormControl>
+                          <Input data-testid="input-edit-event-title" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="projectId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Projeto</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um projeto" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">Nenhum projeto</SelectItem>
+                            {projects.map((project) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="eventDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data *</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={editForm.control}
+                      name="eventTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Horário *</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={editForm.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Local *</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descrição</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            rows={3}
+                            className="resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="notifyStudents"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Notificar Estudantes
+                          </FormLabel>
+                          <FormDescription>
+                            Enviar uma notificação para os alunos do projeto selecionado.
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingEvent(null);
+                        editForm.reset();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={updateMutation.isPending}
+                      data-testid="button-update-event"
+                    >
+                      {updateMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </div>

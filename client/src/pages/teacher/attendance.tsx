@@ -45,7 +45,7 @@ export default function TeacherAttendance() {
     // Actually, let's just use existing data to populate.
 
     const saveAttendanceMutation = useMutation({
-        mutationFn: async (data: { classId: string; date: string; studentId: string; status: string }) => {
+        mutationFn: async (data: { classId: string; date: string; studentId: string; status: string; notes?: string }) => {
             return await apiRequest("/api/attendance", {
                 method: "POST",
                 body: JSON.stringify(data),
@@ -58,10 +58,11 @@ export default function TeacherAttendance() {
                 description: "A chamada foi salva com sucesso.",
             });
         },
-        onError: () => {
+        onError: (error: any) => {
+            console.error("Erro ao salvar chamada:", error);
             toast({
                 title: "Erro",
-                description: "Não foi possível salvar a chamada.",
+                description: error.message || "Não foi possível salvar a chamada.",
                 variant: "destructive",
             });
         },
@@ -77,12 +78,21 @@ export default function TeacherAttendance() {
     const saveAll = async () => {
         if (!selectedClassId) return;
 
+        if (Object.keys(attendanceData).length === 0) {
+            toast({
+                title: "Sem alterações",
+                description: "Nenhuma alteração de presença para salvar.",
+            });
+            return;
+        }
+
         const promises = Object.entries(attendanceData).map(([studentId, status]) =>
             saveAttendanceMutation.mutateAsync({
                 classId: selectedClassId,
                 date: selectedDate,
                 studentId,
-                status
+                status,
+                notes: "" // Garantindo que notes seja enviado, mesmo que vazio
             })
         );
 
