@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Icon } from "@/components/Icon";
 import { ProjectCard } from "@/components/ProjectCard";
 import { SubmitEvidenceModal } from "@/components/SubmitEvidenceModal";
+import { UpcomingDeadlines } from "@/components/UpcomingDeadlines";
 import type { ProjectWithTeacher } from "@shared/schema";
 
 export default function StudentHome() {
@@ -51,7 +52,7 @@ export default function StudentHome() {
               <p className="text-muted-foreground">Continue suas missões e acumule XP.</p>
             </div>
           </div>
-          
+
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-extrabold text-primary" data-testid="text-student-level">Nível {studentLevel}</span>
@@ -62,8 +63,8 @@ export default function StudentHome() {
                 <span data-testid="text-next-level-xp">{xpForNextLevel} XP</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-1000" 
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-1000"
                   style={{ width: `${xpProgress}%` }}
                   data-testid="progress-xp"
                 ></div>
@@ -73,15 +74,18 @@ export default function StudentHome() {
         </div>
       </div>
 
+      {/* Upcoming Deadlines Widget */}
+      <UpcomingDeadlines />
+
       {/* Projects Grid */}
       <div>
         <h3 className="text-2xl font-bold text-foreground mb-6">Meus Projetos Ativos</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {projects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project} 
-              showSubmitButton 
+            <ProjectCard
+              key={project.id}
+              project={project}
+              showSubmitButton
               onSubmit={() => setSelectedProject(project)}
             />
           ))}
@@ -90,7 +94,7 @@ export default function StudentHome() {
 
       {/* Submit Modal */}
       {selectedProject && (
-        <SubmitEvidenceModal 
+        <SubmitEvidenceModal
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
           onSubmit={handleSubmit}

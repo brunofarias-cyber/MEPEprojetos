@@ -46,13 +46,17 @@ export default function TeacherAttendance() {
 
     const saveAttendanceMutation = useMutation({
         mutationFn: async (data: { classId: string; date: string; studentId: string; status: string; notes?: string }) => {
-            return await apiRequest("/api/attendance", {
+            console.log("[AttendanceMutation] Sending data:", data);
+
+            const response = await apiRequest("/api/attendance", {
                 method: "POST",
-                body: JSON.stringify(data),
+                body: data,
             });
+
+            return response;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/attendance", selectedClassId] });
+            queryClient.invalidateQueries({ queryKey: [`/api/attendance/${selectedClassId}`] });
             toast({
                 title: "Presença registrada",
                 description: "A chamada foi salva com sucesso.",
@@ -86,15 +90,20 @@ export default function TeacherAttendance() {
             return;
         }
 
-        const promises = Object.entries(attendanceData).map(([studentId, status]) =>
-            saveAttendanceMutation.mutateAsync({
+        console.log("[Attendance] Saving for class:", selectedClassId);
+
+        const promises = Object.entries(attendanceData).map(([studentId, status]) => {
+            const payload = {
                 classId: selectedClassId,
                 date: selectedDate,
                 studentId,
                 status,
-                notes: "" // Garantindo que notes seja enviado, mesmo que vazio
-            })
-        );
+                notes: ""
+            };
+            console.log("[Attendance] Payload:", payload);
+
+            return saveAttendanceMutation.mutateAsync(payload);
+        });
 
         try {
             await Promise.all(promises);

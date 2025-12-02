@@ -280,7 +280,9 @@ export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id:
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true });
 export const insertStudentClassSchema = createInsertSchema(studentClasses).omit({ id: true, enrolledAt: true });
 export const insertBnccDocumentSchema = createInsertSchema(bnccDocuments).omit({ id: true, uploadedAt: true });
-export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true });
+export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({ id: true, createdAt: true }).extend({
+  studentId: z.string().optional(), // Make explicitly optional for team feedback
+});
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
 export const insertEventResponseSchema = createInsertSchema(eventResponses).omit({ id: true, respondedAt: true });
 export const insertAttendanceSchema = createInsertSchema(attendance).omit({ id: true }).extend({

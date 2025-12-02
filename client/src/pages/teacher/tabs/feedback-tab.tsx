@@ -8,6 +8,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Feedback } from "@shared/schema";
 
 interface Student {
@@ -26,6 +27,7 @@ interface FeedbackTabProps {
 }
 
 export function FeedbackTab({ projectId }: FeedbackTabProps) {
+    const { user } = useAuth();
     const { toast } = useToast();
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [feedbackText, setFeedbackText] = useState("");
@@ -41,18 +43,26 @@ export function FeedbackTab({ projectId }: FeedbackTabProps) {
 
     const createFeedbackMutation = useMutation({
         mutationFn: async ({ studentId, comment }: { studentId: string; comment: string }) => {
-            // Get teacher ID from current user
-            const currentUser = await apiRequest('/api/auth/me');
-            const teacher = await apiRequest(`/api/me/teacher`);
+            // Get teacher ID from auth context
+            const teacherId = user?.roleData?.id;
+
+            console.log("[FeedbackMutation] Data:", {
+                teacherId,
+                projectId,
+                studentId,
+                comment
+            });
+
+            if (!teacherId) throw new Error("Professor não identificado");
 
             return await apiRequest("/api/feedbacks", {
                 method: "POST",
-                body: JSON.stringify({
+                body: {
+                    teacherId,
                     projectId,
-                    teacherId: teacher.id,
                     studentId,
-                    comment,
-                }),
+                    comment
+                },
             });
         },
         onSuccess: () => {
@@ -77,7 +87,7 @@ export function FeedbackTab({ projectId }: FeedbackTabProps) {
         mutationFn: async ({ id, comment }: { id: string; comment: string }) => {
             return await apiRequest(`/api/feedbacks/${id}`, {
                 method: "PATCH",
-                body: JSON.stringify({ comment }),
+                body: { comment },
             });
         },
         onSuccess: () => {

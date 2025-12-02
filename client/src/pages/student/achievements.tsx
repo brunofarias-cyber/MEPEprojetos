@@ -164,15 +164,40 @@ export default function StudentAchievements() {
 // Helper function to determine default total for progress-based achievements
 function getDefaultTotal(achievementId: string): number {
   const totals: Record<string, number> = {
-    'ach-entregas-pontuais': 5,
-    'ach-mestre-projetos': 10,
-    'ach-pontualidade': 20,
-    'ach-bom-aluno': 3,
+    // Excelência Acadêmica
+    'ach-primeira-entrega': 1,
+    'ach-perfeccionista': 1,
     'ach-excelencia': 5,
-    'ach-melhoria-continua': 3,
+    'ach-bom-aluno': 3,
+    'ach-mestre-projetos': 10,
+    'ach-sabio': 1,
+
+    // Pontualidade e Disciplina
+    'ach-pontual': 5,
+    'ach-pontualidade': 20,
+    'ach-madrugador': 1,
+    'ach-sempre-presente': 1,
+
+    // Colaboração
     'ach-colaborador-ativo': 5,
     'ach-trabalho-equipe': 5,
+    'ach-lider': 3,
+    'ach-mentor': 5,
+
+    // Criatividade
     'ach-criativo': 3,
+    'ach-inovador': 5,
+    'ach-artista': 3,
+
+    // Desafios Especiais
+    'ach-melhoria-continua': 3,
+    'ach-resiliente': 1,
+    'ach-versatil': 4,
+    'ach-pesquisador': 5,
+    'ach-apresentador': 3,
+    'ach-maratonista': 3,
+    'ach-trabalho-duro': 50,
+    'ach-lenda': 20,
   };
   return totals[achievementId] || 1;
 }

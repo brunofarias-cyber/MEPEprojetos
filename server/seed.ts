@@ -133,12 +133,42 @@ export async function seedDatabase() {
   }
   console.log("✅ Students created");
 
-  // Seed Achievements
+  // Seed Achievements - 25 conquistas em 5 categorias
   const achievementsData: InsertAchievement[] = [
-    { title: "Primeira Entrega", description: "Complete sua primeira submissão", xp: 100, icon: "rocket" },
-    { title: "Colaborador Ativo", description: "Participe de 10 projetos em equipe", xp: 250, icon: "users" },
-    { title: "Pesquisador", description: "Realize pesquisas em 5 projetos", xp: 300, icon: "book-open" },
-    { title: "Apresentador Expert", description: "Apresente 3 projetos com nota máxima", xp: 500, icon: "trophy" },
+    // 📚 Categoria: Excelência Acadêmica
+    { title: "Primeira Entrega", description: "Complete sua primeira submissão", xp: 200, icon: "rocket" },
+    { title: "Perfeccionista", description: "Obtenha nota 100 em um projeto", xp: 800, icon: "star" },
+    { title: "Estrela da Excelência", description: "Obtenha 5 notas acima de 90", xp: 1200, icon: "award" },
+    { title: "Bom Aluno", description: "Mantenha média acima de 80 em 3 projetos", xp: 600, icon: "graduation-cap" },
+    { title: "Mestre dos Projetos", description: "Complete 10 projetos", xp: 1500, icon: "crown" },
+    { title: "Sábio", description: "Alcance o nível 10", xp: 2000, icon: "brain" },
+
+    // ⏰ Categoria: Pontualidade e Disciplina
+    { title: "Pontual", description: "Entregue 5 projetos antes do prazo", xp: 700, icon: "clock" },
+    { title: "Pontualidade Britânica", description: "Entregue 20 projetos no prazo", xp: 1800, icon: "alarm-clock" },
+    { title: "Madrugador", description: "Entregue um projeto com 7+ dias de antecedência", xp: 500, icon: "sunrise" },
+    { title: "Sempre Presente", description: "Tenha 100% de presença em 1 mês", xp: 600, icon: "check-circle" },
+
+    // 🤝 Categoria: Colaboração e Trabalho em Equipe
+    { title: "Colaborador Nato", description: "Participe de 5 projetos em equipe", xp: 500, icon: "users" },
+    { title: "Espírito de Equipe", description: "Complete 5 projetos com avaliação máxima de colaboração", xp: 900, icon: "user-check" },
+    { title: "Líder Inspirador", description: "Seja líder em 3 projetos de equipe", xp: 1000, icon: "briefcase" },
+    { title: "Mentor", description: "Ajude 5 colegas com feedback positivo", xp: 700, icon: "heart" },
+
+    // 🎨 Categoria: Criatividade e Inovação
+    { title: "Pensador Criativo", description: "Receba 3 elogios por criatividade", xp: 800, icon: "lightbulb" },
+    { title: "Inovador", description: "Apresente uma solução original em 5 projetos", xp: 1200, icon: "zap" },
+    { title: "Artista", description: "Entregue 3 projetos com apresentação visual excepcional", xp: 700, icon: "palette" },
+
+    // 🏆 Categoria: Desafios Especiais
+    { title: "Melhoria Contínua", description: "Aumente sua nota em 3 projetos consecutivos", xp: 900, icon: "trending-up" },
+    { title: "Resiliente", description: "Melhore de uma nota baixa (<70) para alta (>85)", xp: 1100, icon: "shield" },
+    { title: "Versátil", description: "Complete projetos em 4 matérias diferentes", xp: 1000, icon: "layers" },
+    { title: "Pesquisador Expert", description: "Faça pesquisas aprofundadas em 5 projetos", xp: 600, icon: "book-open" },
+    { title: "Apresentador Expert", description: "Apresente 3 projetos com nota máxima", xp: 1000, icon: "trophy" },
+    { title: "Maratonista", description: "Complete 3 projetos em uma semana", xp: 1300, icon: "zap" },
+    { title: "Trabalho Duro", description: "Dedique 50+ horas em projetos", xp: 900, icon: "clock" },
+    { title: "Lenda Viva", description: "Desbloqueie 20 conquistas", xp: 2000, icon: "flame" },
   ];
 
   const achievements = [];

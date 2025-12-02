@@ -68,7 +68,7 @@ export default function TeacherFeedback() {
     mutationFn: async (data: { teacherId: string; projectId: string; studentId?: string | null; comment: string }) => {
       return await apiRequest(`/api/feedbacks`, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       });
     },
     onSuccess: () => {
@@ -94,7 +94,7 @@ export default function TeacherFeedback() {
     mutationFn: async ({ id, comment }: { id: string; comment: string }) => {
       return await apiRequest(`/api/feedbacks/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ comment }),
+        body: { comment },
       });
     },
     onSuccess: () => {
@@ -147,12 +147,19 @@ export default function TeacherFeedback() {
       return;
     }
 
-    createMutation.mutate({
+    // Build payload, only include studentId if it's not "all"
+    const payload: any = {
       teacherId: teacher.id,
       projectId: data.projectId,
-      studentId: data.studentId === "all" ? undefined : data.studentId,
       comment: data.comment,
-    });
+    };
+
+    // Only add studentId if it's not "all" (team feedback)
+    if (data.studentId && data.studentId !== "all") {
+      payload.studentId = data.studentId;
+    }
+
+    createMutation.mutate(payload);
   };
 
   const handleEditSubmit = (id: string) => {
