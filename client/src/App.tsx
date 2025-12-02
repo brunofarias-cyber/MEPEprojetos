@@ -79,7 +79,7 @@ function ProtectedRoutes() {
                     <Route path="/teacher/dashboard" component={TeacherDashboard} />
                     <Route path="/project/:id" component={TeacherProjectDetail} />
                     <Route path="/classes" component={TeacherClasses} />
-                    <Route path="/reports" component={TeacherReports} />
+                    <Route path="/reports" component={() => <TeacherReports />} />
                     <Route path="/rubrics" component={TeacherRubrics} />
                     <Route path="/bncc" component={TeacherBncc} />
                     <Route path="/feedbacks" component={TeacherFeedback} />
@@ -92,9 +92,9 @@ function ProtectedRoutes() {
                 {user.role === 'student' && (
                   <>
                     <Route path="/" component={StudentHome} />
-                    <Route path="/projects" component={StudentProjects} />
+                    <Route path="/projects" component={() => <StudentProjects />} />
                     <Route path="/calendar" component={StudentCalendar} />
-                    <Route path="/achievements" component={StudentAchievements} />
+                    <Route path="/achievements" component={() => <StudentAchievements />} />
                   </>
                 )}
 
