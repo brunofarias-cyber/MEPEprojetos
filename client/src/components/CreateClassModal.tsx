@@ -38,7 +38,7 @@ export function CreateClassModal() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  
+
   const teacherId = user?.roleData?.id;
 
   const form = useForm<ClassFormValues>({
@@ -55,13 +55,13 @@ export function CreateClassModal() {
       if (!teacherId) {
         throw new Error("ID do professor não encontrado");
       }
-      
+
       return apiRequest("/api/classes", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           ...data,
           teacherId,
-        }),
+        },
       });
     },
     onSuccess: () => {
@@ -90,8 +90,8 @@ export function CreateClassModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          className="shadow-md" 
+        <Button
+          className="shadow-md"
           data-testid="button-create-class"
         >
           <Icon name="plus" size={18} className="mr-2" />
@@ -115,9 +115,9 @@ export function CreateClassModal() {
                 <FormItem>
                   <FormLabel>Nome da Turma</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Ex: 1º Ano A, 9º Ano Manhã..." 
-                      {...field} 
+                    <Input
+                      placeholder="Ex: 1º Ano A, 9º Ano Manhã..."
+                      {...field}
                       data-testid="input-class-name"
                     />
                   </FormControl>
@@ -133,9 +133,9 @@ export function CreateClassModal() {
                 <FormItem>
                   <FormLabel>Número de Alunos</FormLabel>
                   <FormControl>
-                    <Input 
+                    <Input
                       type="number"
-                      placeholder="0" 
+                      placeholder="0"
                       {...field}
                       onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       data-testid="input-student-count"
@@ -154,7 +154,7 @@ export function CreateClassModal() {
                   <FormLabel>Engajamento Inicial (%)</FormLabel>
                   <FormControl>
                     <div className="space-y-2">
-                      <Input 
+                      <Input
                         type="range"
                         min="0"
                         max="100"
@@ -185,8 +185,8 @@ export function CreateClassModal() {
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createClassMutation.isPending}
                 data-testid="button-submit"
               >
