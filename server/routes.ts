@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import { PDFParse } from "pdf-parse";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { storage } from "./storage";
 import { extractCompetenciesFromText, analyzeProjectAlignment, analyzeProjectPlanning } from "./services/bnccAiService";
 
@@ -1228,20 +1228,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[Spreadsheet Import] Processing file:", req.file.originalname);
 
-      // Parse spreadsheet
-      let workbook: XLSX.WorkBook;
+      // Parse spreadsheet using exceljs
+      const workbook = new ExcelJS.Workbook();
       try {
-        workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        await workbook.xlsx.load(req.file.buffer);
       } catch (error: any) {
         return res.status(400).json({ error: "Erro ao ler planilha: " + error.message });
       }
 
-      // Get first sheet
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        return res.status(400).json({ error: "Planilha inválida ou sem abas" });
+      }
 
-      // Convert to JSON
-      const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      // Convert worksheet to JSON-like array (first row as header)
+      const headerRow = worksheet.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        const val = cell.value;
+        headers.push(val == null ? `` : String(val).trim());
+      });
+
+      const rawData: any[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // skip header
+        const rowObj: Record<string, any> = {};
+        headers.forEach((hdr, idx) => {
+          const cell = row.getCell(idx + 1);
+          const v = cell.value;
+          rowObj[hdr || `column_${idx + 1}`] = v == null ? '' : (typeof v === 'object' && 'text' in v ? (v as any).text : String(v));
+        });
+        rawData.push(rowObj);
+      });
 
       if (rawData.length === 0) {
         return res.status(400).json({ error: "A planilha está vazia" });
