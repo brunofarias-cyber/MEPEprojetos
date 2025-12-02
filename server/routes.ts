@@ -852,6 +852,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Attendance Report - Statistics by student
+  app.get("/api/attendance/report/:classId", async (req, res) => {
+    try {
+      const { classId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      // Get class info
+      const classInfo = await storage.getClass(classId);
+      if (!classInfo) {
+        return res.status(404).json({ error: "Turma não encontrada" });
+      }
+
+      // Get all students in the class
+      const students = await storage.getStudentsByClass(classId);
+
+      // Get all attendance records for the class
+      const allAttendance = await storage.getAttendanceByClass(classId);
+
+      // Filter by date range if provided
+      let filteredAttendance = allAttendance;
+      if (startDate || endDate) {
+        filteredAttendance = allAttendance.filter((record) => {
+          const recordDate = record.date;
+          if (startDate && recordDate < startDate) return false;
+          if (endDate && recordDate > endDate) return false;
+          return true;
+        });
+      }
+
+      // Get unique dates (total school days)
+      const uniqueDates = Array.from(new Set(filteredAttendance.map(r => r.date)));
+      const totalDays = uniqueDates.length;
+
+      // Calculate statistics per student
+      const studentStats = students.map((student) => {
+        const studentRecords = filteredAttendance.filter(
+          (r) => r.studentId === student.id
+        );
+
+        const present = studentRecords.filter((r) => r.status === "present").length;
+        const absent = studentRecords.filter((r) => r.status === "absent").length;
+        const late = studentRecords.filter((r) => r.status === "late").length;
+
+        const presencePercentage =
+          totalDays > 0 ? ((present + late) / totalDays) * 100 : 0;
+
+        return {
+          studentId: student.id,
+          studentName: student.name,
+          avatar: student.avatar,
+          statistics: {
+            totalDays,
+            present,
+            absent,
+            late,
+            presencePercentage: Math.round(presencePercentage * 10) / 10, // Round to 1 decimal
+          },
+        };
+      });
+
+      // Sort by name
+      studentStats.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+      res.json({
+        classId: classInfo.id,
+        className: classInfo.name,
+        period: {
+          start: startDate || uniqueDates[0] || null,
+          end: endDate || uniqueDates[uniqueDates.length - 1] || null,
+        },
+        students: studentStats,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/attendance/:classId", async (req, res) => {
     try {
       const { date } = req.query;

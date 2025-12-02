@@ -82,6 +82,14 @@ export function AppSidebar({ role, onLogout, userName, userAvatar }: AppSidebarP
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={location === '/attendance-report'}>
+                      <Link href="/attendance-report" data-testid="nav-relatorio-presenca">
+                        <Icon name="fileBarChart" size={20} />
+                        <span>Relatório de Presença</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={location === '/reports'}>
                       <Link href="/reports" data-testid="nav-relatorios">
                         <Icon name="barChart" size={20} />

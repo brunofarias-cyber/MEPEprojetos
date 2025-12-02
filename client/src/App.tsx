@@ -21,6 +21,7 @@ import TeacherBncc from "@/pages/teacher/bncc";
 import TeacherFeedback from "@/pages/teacher/feedbacks";
 import TeacherCalendar from "@/pages/teacher/calendar";
 import TeacherAttendance from "@/pages/teacher/attendance";
+import TeacherAttendanceReport from "@/pages/teacher/attendance-report";
 
 // Student views
 import StudentHome from "@/pages/student/home";
@@ -85,6 +86,7 @@ function ProtectedRoutes() {
                     <Route path="/feedbacks" component={TeacherFeedback} />
                     <Route path="/calendar" component={TeacherCalendar} />
                     <Route path="/attendance" component={TeacherAttendance} />
+                    <Route path="/attendance-report" component={TeacherAttendanceReport} />
                   </>
                 )}
 
