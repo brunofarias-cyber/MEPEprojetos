@@ -48,7 +48,7 @@ export default function TeacherRubrics() {
     mutationFn: async ({ id, ...data }: Partial<RubricCriteria> & { id: string }) => {
       return await apiRequest(`/api/rubrics/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: data, // Remove manual JSON.stringify - apiRequest handles it
       });
     },
     onSuccess: () => {
