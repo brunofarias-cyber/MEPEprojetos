@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { useAuth } from "@/contexts/AuthContext";
 import { CreateClassModal } from "@/components/CreateClassModal";
-import { SpreadsheetImport } from "@/components/SpreadsheetImport";
 import { ManageClassModal } from "@/components/ManageClassModal";
 import type { Class } from "@shared/schema";
+import React, { Suspense, lazy } from "react";
+
+const SpreadsheetImport = lazy(() => import("@/components/SpreadsheetImport").then(mod => ({ default: mod.SpreadsheetImport })));
 
 export default function TeacherClasses() {
   const { user } = useAuth();
@@ -34,7 +36,9 @@ export default function TeacherClasses() {
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
           <div className="flex gap-2">
-            <SpreadsheetImport />
+            <Suspense fallback={<div className="w-8 h-8 rounded bg-muted-foreground/10" aria-hidden /> }>
+              <SpreadsheetImport />
+            </Suspense>
             <CreateClassModal />
           </div>
         </div>
@@ -50,7 +54,9 @@ export default function TeacherClasses() {
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-bold text-foreground" data-testid="heading-classes">Minhas Turmas</h2>
         <div className="flex gap-2">
-          <SpreadsheetImport />
+          <Suspense fallback={<div className="w-8 h-8 rounded bg-muted-foreground/10" aria-hidden /> }>
+            <SpreadsheetImport />
+          </Suspense>
           <CreateClassModal />
         </div>
       </div>
