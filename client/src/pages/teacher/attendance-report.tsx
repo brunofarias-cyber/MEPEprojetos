@@ -36,14 +36,20 @@ interface AttendanceReport {
     students: StudentStats[];
 }
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function AttendanceReport() {
+    const { user } = useAuth();
     const [selectedClassId, setSelectedClassId] = useState<string>("");
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
 
-    // Fetch classes
+    const teacherId = user?.roleData?.id;
+
+    // Fetch classes - only for this teacher
     const { data: classes = [] } = useQuery<Class[]>({
-        queryKey: ["/api/classes"],
+        queryKey: ["/api/teachers", teacherId, "classes"],
+        enabled: !!teacherId,
     });
 
     // Fetch report when class is selected

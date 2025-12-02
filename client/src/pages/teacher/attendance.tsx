@@ -11,15 +11,21 @@ import { ptBR } from "date-fns/locale";
 import { Check, X, Clock, Calendar as CalendarIcon, Save } from "lucide-react";
 import type { Class, Student, Attendance } from "@shared/schema";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function TeacherAttendance() {
     const { toast } = useToast();
+    const { user } = useAuth();
     const [selectedClassId, setSelectedClassId] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
     const [attendanceData, setAttendanceData] = useState<Record<string, string>>({});
 
-    // Fetch classes
+    const teacherId = user?.roleData?.id;
+
+    // Fetch classes - only for this teacher
     const { data: classes = [] } = useQuery<Class[]>({
-        queryKey: ["/api/classes"],
+        queryKey: ["/api/teachers", teacherId, "classes"],
+        enabled: !!teacherId,
     });
 
     // Fetch students for the selected class
