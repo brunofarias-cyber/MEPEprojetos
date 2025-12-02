@@ -167,6 +167,7 @@ export interface IStorage {
   // Attendance
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
   getAttendanceByClass(classId: string, date: string): Promise<Attendance[]>;
+  getAllAttendanceByClass(classId: string): Promise<Attendance[]>; // For reports - no date filter
 
   // Student Classes (Enrollments)
   addStudentToClass(studentClass: InsertStudentClass): Promise<StudentClass>;
@@ -961,6 +962,14 @@ export class DatabaseStorage implements IStorage {
         eq(schema.attendance.classId, classId),
         eq(schema.attendance.date, date)
       ));
+  }
+
+  // Get all attendance records for a class (no date filter) - for reports
+  async getAllAttendanceByClass(classId: string): Promise<Attendance[]> {
+    return await db
+      .select()
+      .from(schema.attendance)
+      .where(eq(schema.attendance.classId, classId));
   }
 
   // Student Classes (Enrollments)

@@ -867,8 +867,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all students in the class
       const students = await storage.getStudentsByClass(classId);
 
-      // Get all attendance records for the class
-      const allAttendance = await storage.getAttendanceByClass(classId);
+      // Get all attendance records for the class (without date filter)
+      const allAttendance = await storage.getAllAttendanceByClass(classId);
 
       // Filter by date range if provided
       let filteredAttendance = allAttendance;
