@@ -30,10 +30,32 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
-  url: string,
-  options?: Omit<RequestInit, 'body'> & { body?: any },
-): Promise<any> {
+export async function apiRequest(methodOrUrl: string, ...rest: any[]): Promise<any> {
+  const maybeUrlOrOptions = rest[0];
+  const maybeOptions = rest[1];
+  // Support both call styles:
+  // 1) apiRequest(url, options?)
+  // 2) apiRequest(method, url, options?)  (legacy usage in many files)
+  let url: string;
+  let options: Omit<RequestInit, 'body'> & { body?: any } | undefined;
+
+  const httpMethodRegex = /^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)$/i;
+  if (typeof maybeUrlOrOptions === 'string' && httpMethodRegex.test(methodOrUrl)) {
+    // method-first signature: apiRequest(method, url, optionsOrBody?)
+    url = maybeUrlOrOptions;
+    // if caller passed a plain object as third arg, treat it as body
+    if (maybeOptions && (typeof maybeOptions !== 'object' || !("method" in maybeOptions || "headers" in maybeOptions || "body" in maybeOptions))) {
+      options = { body: maybeOptions } as any;
+    } else {
+      options = maybeOptions as any;
+    }
+    options = { ...(options || {}), method: methodOrUrl.toUpperCase() } as any;
+  } else {
+    // url-first signature: apiRequest(url, options?)
+    url = methodOrUrl;
+    options = maybeUrlOrOptions as any;
+  }
+
   // Get JWT token from localStorage for authentication
   const token = localStorage.getItem('bprojetos_token');
 
@@ -50,7 +72,7 @@ export async function apiRequest(
   }
 
   const res = await fetch(url, {
-    ...options,
+    ...(options || {}),
     body,
     headers,
     credentials: "include",

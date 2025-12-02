@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,8 +23,7 @@ export default function StudentPortfolio() {
     const { data: portfolioData, isLoading } = useQuery({
         queryKey: ["portfolio", user?.id],
         queryFn: async () => {
-            const res = await apiRequest("GET", `/api/students/${user?.id}/portfolio`);
-            return res.json();
+            return await apiRequest("GET", `/api/students/${user?.id}/portfolio`);
         },
         enabled: !!user,
     });
@@ -33,8 +32,7 @@ export default function StudentPortfolio() {
     const { data: submissions, isLoading: isLoadingSubmissions } = useQuery({
         queryKey: ["student-submissions", user?.id],
         queryFn: async () => {
-            const res = await apiRequest("GET", `/api/students/${user?.id}/submissions`);
-            return res.json();
+            return await apiRequest("GET", `/api/students/${user?.id}/submissions`);
         },
         enabled: !!user,
     });

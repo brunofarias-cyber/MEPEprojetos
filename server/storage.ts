@@ -209,6 +209,36 @@ export interface IStorage {
   getAtRiskStudents(): Promise<AtRiskStudent[]>;
 }
 
+// Helper functions for analytics (simple implementations to keep build green)
+function calculateSubmissionRate(totalSubmissions: number, totalStudents: number, totalProjects: number): number {
+  if (totalStudents === 0 || totalProjects === 0) return 0;
+  const rate = (totalSubmissions / (totalStudents * totalProjects)) * 100;
+  return Math.round(rate * 100) / 100;
+}
+
+function calculateAverageGrade(submissions: any[]): number {
+  if (!submissions || submissions.length === 0) return 0;
+  const grades = submissions.map(s => s.grade || 0);
+  const avg = grades.reduce((a: number, b: number) => a + b, 0) / grades.length;
+  return Math.round(avg * 100) / 100;
+}
+
+function calculateEngagement(submissionsCount: number, studentsCount: number, benchmark: number): number {
+  if (studentsCount === 0) return 0;
+  const rate = (submissionsCount / (studentsCount * benchmark)) * 100;
+  return Math.round(rate * 100) / 100;
+}
+
+function calculateAttendanceRate(present: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((present / total) * 100);
+}
+
+function isStudentAtRisk(student: any, absences: number, submissions: number): boolean {
+  if (!student) return false;
+  return (absences > 5) || (submissions < 1) || (student.xp || 0) < 50;
+}
+
 export class DatabaseStorage implements IStorage {
   // Users (Authentication)
   async getUser(id: string): Promise<User | undefined> {
@@ -1195,19 +1225,18 @@ export class DatabaseStorage implements IStorage {
 
   // Missing Methods Implementation
   async addTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    const id = randomUUID();
     const [newMember] = await db
       .insert(schema.teamMembers)
-      .values(member)
+      .values({ ...member, id })
       .returning();
     return newMember;
   }
-
-  async removeTeamMember(id: string): Promise<boolean> {
-    const [deleted] = await db
+  async removeTeamMember(teamId: string, studentId: string): Promise<void> {
+    await db
       .delete(schema.teamMembers)
-      .where(eq(schema.teamMembers.id, id))
-      .returning();
-    return !!deleted;
+      .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.studentId, studentId)));
+    return;
   }
 
   async getEvaluation(id: string): Promise<Evaluation | undefined> {
@@ -1219,9 +1248,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEvaluationScore(score: InsertEvaluationScore): Promise<EvaluationScore> {
+    const id = randomUUID();
     const [newScore] = await db
       .insert(schema.evaluationScores)
-      .values(score)
+      .values({ ...score, id })
       .returning();
     return newScore;
   }
